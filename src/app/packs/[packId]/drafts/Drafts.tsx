@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<Output["status"], string> = {
   failed: "Failed",
 };
 
-const COMING: Partial<Record<OutputSpecId, string>> = { header: "Phase 3", search: "Phase 3" };
+const COMING: Partial<Record<OutputSpecId, string>> = {};
 
 const SEG_COLOUR = { screen: "var(--seg-screen)", screenshot: "var(--mint)", ai_scene: "var(--seg-ai)", text: "var(--seg-text)", end_card: "var(--seg-end)" } as const;
 
@@ -60,7 +60,12 @@ export function Drafts({ packId }: { packId: string }) {
           </div>
         </PageHead>
 
-        <h2 className="lab mu rise" style={{ margin: "22px 0 12px" }}>App Store</h2>
+        <h2 className="lab mu rise" style={{ margin: "22px 0 12px", display: "flex", gap: 10, alignItems: "center" }}>
+          App Store
+          <span className="pill-tag" style={{ background: "var(--lime)", color: "var(--ink)" }} title="Header and search videos and stills for the iOS 27 App Store">
+            iOS 27 ready
+          </span>
+        </h2>
         <div className="rise" style={{ display: "flex", gap: 18, alignItems: "flex-end", flexWrap: "wrap" }}>
           {(["preview", "header", "search"] as const).map((id, i) => {
             const spec = OUTPUT_SPECS[id];
@@ -119,7 +124,16 @@ export function Drafts({ packId }: { packId: string }) {
           ))}
         </div>
 
-        {selected && <Detail output={selected} clips={pack?.recording?.clips ?? []} onRetry={retry} retrying={retrying} />}
+        {selected && (
+          <Detail
+            output={selected}
+            clips={pack?.recording?.clips ?? []}
+            images={pack?.images ?? {}}
+            brand={pack?.app ? { name: pack.app.name, iconUrl: pack.app.icon_url } : undefined}
+            onRetry={retry}
+            retrying={retrying}
+          />
+        )}
 
         <div className="actionbar">
           <span style={{ flex: "1 1 260px" }}>
@@ -133,7 +147,21 @@ export function Drafts({ packId }: { packId: string }) {
   );
 }
 
-function Detail({ output, clips, onRetry, retrying }: { output: Output; clips: Array<{ id: string; url: string }>; onRetry: () => void; retrying: boolean }) {
+function Detail({
+  output,
+  clips,
+  images,
+  brand,
+  onRetry,
+  retrying,
+}: {
+  output: Output;
+  clips: Array<{ id: string; url: string }>;
+  images: Record<string, string>;
+  brand?: { name: string; iconUrl: string | null };
+  onRetry: () => void;
+  retrying: boolean;
+}) {
   const spec = OUTPUT_SPECS[output.spec];
   const timeline = output.timeline;
   const total = timeline ? totalSeconds(timeline) : 0;
@@ -143,10 +171,25 @@ function Detail({ output, clips, onRetry, retrying }: { output: Output; clips: A
   return (
     <section className="card rise" style={{ marginTop: 36, gridTemplateColumns: "minmax(0, 300px) minmax(0, 1fr)", gap: 28, alignItems: "start" }}>
       <div className="player-box" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
-        {timeline ? (
+        {output.status === "ready" && output.draft_url ? (
+          // The rendered file is what ships: play it once it exists. The live preview is only for while it renders.
+          <video src={output.draft_url} controls autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+        ) : timeline ? (
           <Player
             component={TimelineVideo}
-            inputProps={{ timeline, clipUrls: Object.fromEntries(clips.map((c) => [c.id, c.url])), watermark: true, loop: spec.loop, baseWidth: spec.width, baseHeight: spec.height } satisfies TimelineVideoProps}
+            inputProps={
+              {
+                timeline,
+                clipUrls: Object.fromEntries(clips.map((c) => [c.id, c.url])),
+                imageUrls: images,
+                brand,
+                watermark: true,
+                loop: spec.loop,
+                baseWidth: spec.width,
+                baseHeight: spec.height,
+                safeArea: spec.safeArea,
+              } satisfies TimelineVideoProps
+            }
             durationInFrames={Math.max(1, Math.round(total * spec.fps))}
             fps={spec.fps}
             compositionWidth={w}
@@ -185,6 +228,22 @@ function Detail({ output, clips, onRetry, retrying }: { output: Output; clips: A
                 <span key={i} className={`seg-block${s.type === "ai_scene" ? " ai" : ""}`} style={{ left: `${(s.start / total) * 100}%`, width: `${(s.duration / total) * 100}%`, background: SEG_COLOUR[s.type] }}>
                   {s.type === "screen" ? `▯ ${s.clip_id?.replace("clip_", "Clip ")}` : s.type === "screenshot" ? `▣ ${s.image_id?.replace("shot_", "Shot ")}` : s.type}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {output.stills.length > 0 && (
+          <div style={{ display: "grid", gap: 8 }}>
+            <span className="lab mu">Stills for iOS 27</span>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {output.stills.map((still) => (
+                <a key={still.id} href={still.url} download={still.fileName} target="_blank" rel="noreferrer" style={{ display: "grid", gap: 6, width: 200, color: "inherit", textDecoration: "none" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={still.url} alt={still.label} style={{ width: "100%", borderRadius: 10, border: "1px solid var(--line)" }} />
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{still.label} ↓</span>
+                  <span className="mono mu" style={{ fontSize: 11 }}>PNG · {still.size} in the final pack</span>
+                </a>
               ))}
             </div>
           </div>

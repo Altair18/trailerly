@@ -185,3 +185,8 @@ export async function idleSpans(input: string, duration: number, min = 1.2): Pro
   );
   return parseFreezes(stderr, duration);
 }
+
+/** Re-save an image as an RGB PNG with no alpha channel (App Store Connect rejects transparency). */
+export async function flattenPng(input: string, output: string): Promise<void> {
+  await run("ffmpeg", ["-y", "-v", "error", "-i", input, "-frames:v", "1", "-pix_fmt", "rgb24", output], { maxBuffer: MAX_BUFFER });
+}

@@ -22,7 +22,7 @@ export function shortLine(text: string, maxWords = MAX_OVERLAY_WORDS): string {
  * headline over the opening seconds, and the app's name over the end.
  * Used when the model's plan keeps failing.
  */
-export function fallbackPreview(
+export function fallbackTimeline(
   clips: Pick<Clip, "id" | "duration" | "notes" | "idle">[],
   headline: string | null,
   spec: OutputSpec,
@@ -35,6 +35,7 @@ export function fallbackPreview(
   const shotSeconds = shots.length * SCREENSHOT_SECONDS;
   // Prefer clean footage + screenshots; fall back to private clips only when that's still too short.
   const pool = cleanSeconds + shotSeconds >= spec.minSeconds || ranked.length === clean.length ? clean : ranked;
+  const limit = Math.min(spec.maxSeconds, spec.targetSeconds);
   // Skip dead time when the footage left still reaches the minimum length.
   const live = pool.map((c) => ({ id: c.id, ...liveRange(c) }));
   const trimmed = live.reduce((n, c) => n + c.duration, 0) + shotSeconds >= spec.minSeconds;
@@ -42,16 +43,16 @@ export function fallbackPreview(
   const segments: Segment[] = [];
   let t = 0;
   for (const clip of cuts) {
-    if (t >= spec.maxSeconds) break;
-    const duration = round(Math.min(clip.duration, spec.maxSeconds - t));
+    if (t >= limit) break;
+    const duration = round(Math.min(clip.duration, limit - t));
     if (duration < 0.5) break;
     segments.push({ type: "screen", start: round(t), duration, clip_id: clip.id, clip_offset: clip.offset });
     t += duration;
   }
   // Top up to the minimum (or show a few if there's no footage at all) with screenshots.
-  const wanted = pool.length === 0 ? Math.max(spec.minSeconds, Math.min(spec.maxSeconds, shotSeconds)) : spec.minSeconds;
+  const wanted = pool.length === 0 ? Math.max(spec.minSeconds, Math.min(limit, shotSeconds)) : spec.minSeconds;
   for (let i = 0; t < wanted - 0.01 && shots.length > 0; i++) {
-    const duration = round(Math.min(SCREENSHOT_SECONDS, spec.maxSeconds - t));
+    const duration = round(Math.min(SCREENSHOT_SECONDS, limit - t));
     if (duration < 0.5) break;
     segments.push({ type: "screenshot", start: round(t), duration, image_id: shots[i % shots.length]!.id });
     t += duration;
@@ -65,3 +66,6 @@ export function fallbackPreview(
   }
   return { segments };
 }
+
+/** @deprecated name kept for callers written before header and search used the fallback too. */
+export const fallbackPreview = fallbackTimeline;
