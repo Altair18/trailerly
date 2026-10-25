@@ -32,11 +32,31 @@ export async function probe(file: string): Promise<Probe> {
   };
 }
 
-/** Re-encode to constant 30 fps H.264, no audio (screen recordings carry none worth keeping). */
-export async function normalise(input: string, output: string): Promise<void> {
+/**
+ * Phone chrome to cut from a portrait screen recording: the status bar (clock, battery,
+ * notification icons) at the top and the home indicator / gesture bar at the bottom.
+ * Fractions of the frame height; sized for current iPhones and Android phones at 19.5:9 to 20:9.
+ */
+export const STATUS_BAR = 0.055;
+export const GESTURE_BAR = 0.035;
+
+/** ffmpeg crop filter that removes phone chrome from portrait recordings; null for landscape. */
+export function chromeCrop(width: number, height: number): string | null {
+  if (height <= width) return null;
+  const top = Math.round((height * STATUS_BAR) / 2) * 2;
+  const bottom = Math.round((height * GESTURE_BAR) / 2) * 2;
+  return `crop=${width}:${height - top - bottom}:0:${top}`;
+}
+
+/**
+ * Re-encode to constant 30 fps H.264, no audio (screen recordings carry none worth keeping).
+ * Pass `crop` (from chromeCrop) to cut the status and gesture bars at the same time.
+ */
+export async function normalise(input: string, output: string, crop?: string | null): Promise<void> {
+  const filters = [crop, "fps=30", "scale=trunc(iw/2)*2:trunc(ih/2)*2"].filter(Boolean).join(",");
   await run(
     "ffmpeg",
-    ["-y", "-v", "error", "-i", input, "-vf", "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", output],
+    ["-y", "-v", "error", "-i", input, "-vf", filters, "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", output],
     { maxBuffer: MAX_BUFFER },
   );
 }
@@ -57,6 +77,13 @@ export async function cutClip(input: string, output: string, start: number, dura
     ["-y", "-v", "error", "-ss", String(start), "-i", input, "-t", String(duration), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", output],
     { maxBuffer: MAX_BUFFER },
   );
+}
+
+/** One JPEG frame at `at` seconds, `width` px wide, for the vision check. */
+export async function frameAt(input: string, output: string, at: number, width = 512): Promise<void> {
+  await run("ffmpeg", ["-y", "-v", "error", "-ss", String(at), "-i", input, "-frames:v", "1", "-vf", `scale=${width}:-2`, "-q:v", "4", output], {
+    maxBuffer: MAX_BUFFER,
+  });
 }
 
 export async function poster(input: string, output: string, at = 0.5): Promise<void> {

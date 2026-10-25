@@ -47,7 +47,7 @@ export async function GET(_req: Request, { params }: Params) {
       error: source.error,
       file_name: source.file_name,
       duration_s: source.duration_s,
-      clips: clips.map((c) => ({ id: c.id, start: c.start, duration: c.duration, url: urls[c.path], poster: urls[c.poster_path] })),
+      clips: clips.map((c) => ({ id: c.id, start: c.start, duration: c.duration, url: urls[c.path], poster: urls[c.poster_path], notes: c.notes ?? null })),
     },
     outputs: (outputs ?? []).map((o) => ({
       spec: o.spec,

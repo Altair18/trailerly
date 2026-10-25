@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Brief } from "@/lib/schemas/brief";
+import type { ClipNotes } from "@/lib/schemas/clips";
 import type { ChosenHooks, Hook } from "@/lib/schemas/hooks";
 import type { OutputSpecId } from "@/lib/specs/outputs";
 import type { Timeline } from "@/lib/timeline/schema";
@@ -21,7 +22,7 @@ export interface PackState {
     error: string | null;
     file_name: string | null;
     duration_s: number | null;
-    clips: Array<{ id: string; start: number; duration: number; url: string; poster: string }>;
+    clips: Array<{ id: string; start: number; duration: number; url: string; poster: string; notes: ClipNotes | null }>;
   } | null;
   outputs: Array<{
     spec: OutputSpecId;

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "trigger:dev": "trigger dev",
-    "remotion:studio": "remotion studio src/remotion/index.ts"
+    "remotion:studio": "remotion studio src/remotion/index.ts",
+    "smoke:render": "node -e \"require('@trigger.dev/sdk').tasks.trigger('render-smoke', {}).then(r=>console.log('Triggered', r.id))\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

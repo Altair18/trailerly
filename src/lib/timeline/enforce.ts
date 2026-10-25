@@ -3,6 +3,14 @@ import type { Segment, Timeline } from "./schema";
 
 const EPS = 0.05;
 
+/** On-screen text limits: short enough to read on a phone in one glance. */
+export const MAX_OVERLAY_WORDS = 7;
+export const MAX_OVERLAY_CHARS = 42;
+export const MAX_CARD_WORDS = 9;
+/** Reading time: 0.3 s per word, never under 1.2 s. */
+export const readSeconds = (text: string) => Math.max(1.2, 0.3 * wordCount(text));
+export const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+
 export const isOverlay = (s: Segment) => s.type === "text" && s.overlay === true;
 export const totalSeconds = (timeline: Timeline) => Math.max(...timeline.segments.map((s) => s.start + s.duration));
 
@@ -26,7 +34,21 @@ export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: 
     }
     if (s.type === "screen" && !s.clip_id) errors.push(`Screen segment at ${s.start}s has no clip_id.`);
     if (s.type === "ai_scene" && !s.prompt) errors.push(`AI scene at ${s.start}s has no prompt.`);
-    if ((s.type === "text" || s.type === "end_card") && !s.text?.trim()) errors.push(`Text at ${s.start}s is empty.`);
+    if ((s.type === "text" || s.type === "end_card") && !s.text?.trim() && s.style !== "brand") {
+      errors.push(`Text at ${s.start}s is empty.`);
+    }
+    if (s.text?.trim()) {
+      const words = wordCount(s.text);
+      const where = `Text "${s.text}" at ${s.start}s`;
+      if (isOverlay(s) && (words > MAX_OVERLAY_WORDS || s.text.trim().length > MAX_OVERLAY_CHARS)) {
+        errors.push(`${where} is too long for on-screen text: use at most ${MAX_OVERLAY_WORDS} words and ${MAX_OVERLAY_CHARS} characters.`);
+      } else if (!isOverlay(s) && words > MAX_CARD_WORDS) {
+        errors.push(`${where} is too long: use at most ${MAX_CARD_WORDS} words.`);
+      }
+      if (s.duration + EPS < readSeconds(s.text)) {
+        errors.push(`${where} is on screen for ${round(s.duration)}s; it needs at least ${round(readSeconds(s.text))}s to read.`);
+      }
+    }
     if (s.type === "screen" && s.clip_id && clipSeconds) {
       const len = clipSeconds[s.clip_id];
       if (len === undefined) errors.push(`Unknown clip "${s.clip_id}" at ${s.start}s.`);
@@ -44,6 +66,19 @@ export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: 
       errors.push(s.start > cursor ? `Gap from ${round(cursor)}s to ${round(s.start)}s.` : `Segments overlap at ${round(s.start)}s.`);
     }
     cursor = s.start + s.duration;
+  }
+
+  // Overlays: one at a time, and inside the video.
+  const overlays = segs.filter(isOverlay).sort((a, b) => a.start - b.start);
+  for (let i = 1; i < overlays.length; i++) {
+    const prev = overlays[i - 1]!;
+    if (overlays[i]!.start < prev.start + prev.duration - EPS) {
+      errors.push(`Text overlays overlap at ${round(overlays[i]!.start)}s; show one line at a time.`);
+    }
+  }
+  const baseEnd = cursor;
+  for (const o of overlays) {
+    if (o.start + o.duration > baseEnd + EPS) errors.push(`Text overlay at ${round(o.start)}s runs past the end of the video.`);
   }
 
   const aiSeconds = sumSeconds(timeline, "ai_scene");

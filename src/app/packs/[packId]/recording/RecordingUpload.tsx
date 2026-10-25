@@ -143,7 +143,18 @@ export function RecordingUpload({ packId }: { packId: string }) {
                     <img src={c.poster} alt="" />
                     <span className="num" style={{ background: accent(i) }}>{i + 1}</span>
                     <span className="dur mono">{fmt(c.duration)}</span>
+                    {c.notes?.personal_info && (
+                      <span className="mono" title={c.notes.privacy_note ?? "Personal data"} style={{ position: "absolute", top: 8, right: 8, fontSize: 11, fontWeight: 700, padding: "3px 6px", borderRadius: 6, background: "var(--coral)", color: "var(--ink)" }}>
+                        PRIVATE
+                      </span>
+                    )}
                   </div>
+                  {c.notes && (
+                    <figcaption style={{ fontSize: 13, marginTop: 8, lineHeight: 1.3 }}>
+                      <b>{c.notes.label}</b>
+                      <span className="mu" style={{ display: "block" }}>{"★".repeat(c.notes.interest)}{"☆".repeat(5 - c.notes.interest)}</span>
+                    </figcaption>
+                  )}
                 </figure>
               ))}
             </div>
@@ -158,8 +169,14 @@ export function RecordingUpload({ packId }: { packId: string }) {
                 <span>{fmt(rec.duration_s ?? 0)}</span>
               </div>
             </div>
+            {rec.clips.some((c) => c.notes?.personal_info) && (
+              <div role="alert" style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,90,78,.12)", border: "1px solid var(--coral)", fontSize: 14 }}>
+                <b>Some clips show personal data</b> ({rec.clips.filter((c) => c.notes?.personal_info).map((c) => c.notes?.privacy_note || c.id).join("; ")}).
+                We&apos;ll leave them out where we can. For the cleanest result, record again with demo data and notifications off.
+              </div>
+            )}
             <p className="mu" style={{ margin: 0, fontSize: 14 }}>
-              We split at screen changes. The App Store preview uses only these clips, never AI scenes.
+              We split at screen changes and trim your phone&apos;s status and gesture bars. The App Store preview uses only these clips, never AI scenes.
             </p>
             {error && <p role="alert" style={{ margin: 0, color: "var(--coral)" }}>{error}</p>}
           </div>

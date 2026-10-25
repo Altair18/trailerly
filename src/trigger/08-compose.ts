@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, metadata, task } from "@trigger.dev/sdk";
-import { readyClips } from "@/lib/packs";
+import { loadPackWithApp, readyClips } from "@/lib/packs";
 import { renderOutput } from "@/lib/render";
 import { DRAFT_SCALE, OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { paths, signedUrls, uploadFile } from "@/lib/storage";
@@ -20,6 +20,8 @@ export const compose = task({
   run: async ({ packId, specs, final }: FinalPayload & { specs: OutputSpecId[] }) => {
     if (final) throw new Error("Final renders arrive with payment (M6).");
     const db = supabaseAdmin();
+    const { app } = await loadPackWithApp(packId);
+    const brand = { name: app.name, iconUrl: app.icon_url };
     const clips = await readyClips(packId);
     const urls = await signedUrls(clips.map((c) => c.path), 6 * 3600);
     const clipUrls = Object.fromEntries(clips.map((c) => [c.id, urls[c.path]!]));
@@ -43,6 +45,7 @@ export const compose = task({
               loop: spec.loop,
               baseWidth: spec.width,
               baseHeight: spec.height,
+              brand,
               scale: DRAFT_SCALE,
             },
             onProgress: (p) => metadata.set(`progress.${id}`, Math.round(p * 100)),
