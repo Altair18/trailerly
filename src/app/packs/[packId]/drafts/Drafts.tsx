@@ -143,7 +143,11 @@ function Detail({ output, clips, onRetry, retrying }: { output: Output; clips: A
   return (
     <section className="card rise" style={{ marginTop: 36, gridTemplateColumns: "minmax(0, 300px) minmax(0, 1fr)", gap: 28, alignItems: "start" }}>
       <div className="player-box" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
-        {timeline ? (
+        {output.status === "ready" && output.draft_url ? (
+          // The rendered file is what the user gets: screenshots, blur and brand card are all baked in.
+          // (The live preview below only has the recording clips, so it can't show those.)
+          <video key={output.draft_url} src={output.draft_url} controls loop playsInline style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+        ) : timeline ? (
           <Player
             component={TimelineVideo}
             inputProps={{ timeline, clipUrls: Object.fromEntries(clips.map((c) => [c.id, c.url])), watermark: true, loop: spec.loop, baseWidth: spec.width, baseHeight: spec.height } satisfies TimelineVideoProps}

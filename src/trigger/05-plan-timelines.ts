@@ -2,6 +2,7 @@ import { logger, task } from "@trigger.dev/sdk";
 import { generateJson } from "@/lib/llm/claude";
 import { ClipNotesReply } from "@/lib/media/analyse";
 import { appScreenshots, labelScreenshots, type Screenshot } from "@/lib/media/screenshots";
+import { isPrivate } from "@/lib/schemas/clips";
 import { Listing } from "@/lib/schemas/listing";
 import { loadPackWithApp, readyClips } from "@/lib/packs";
 import { Brief } from "@/lib/schemas/brief";
@@ -26,6 +27,9 @@ export const planTimelines = task({
     if (clips.length === 0 && screenshots.length === 0) {
       throw new Error("Add a screen recording: this app has no App Store screenshots to fall back on.");
     }
+    // Screenshots only fill in when clean footage is short, so skip labelling them (8 images) when it isn't.
+    const cleanSeconds = clips.filter((c) => !isPrivate(c.notes)).reduce((n, c) => n + c.duration, 0);
+    if (cleanSeconds >= Math.max(...specs.map((id) => OUTPUT_SPECS[id].minSeconds))) screenshots = [];
     if (screenshots.length > 0) {
       try {
         screenshots = await labelScreenshots(screenshots, brief.features, (opts) =>
@@ -45,7 +49,7 @@ export const planTimelines = task({
       const { timeline, source, attempts } = await planTimeline(
         spec,
         { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips, screenshots },
-        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt }),
+        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt, job: "plan" }),
       );
       timelines[id] = timeline;
       await db

@@ -26,7 +26,13 @@ export async function generateJson<T>(opts: {
   maxTokens?: number;
   /** JPEG frames to show the model before the prompt. */
   images?: { data: Buffer; label?: string }[];
+  /**
+   * "light" (default): brief, hooks and labels on ANTHROPIC_MODEL at low effort.
+   * "plan": timelines on ANTHROPIC_PLANNER_MODEL at medium effort, since the code re-asks on mistakes.
+   */
+  job?: "light" | "plan";
 }): Promise<T> {
+  const plan = opts.job === "plan";
   const content: Anthropic.ContentBlockParam[] = [];
   for (const img of opts.images ?? []) {
     if (img.label) content.push({ type: "text", text: img.label });
@@ -34,8 +40,10 @@ export async function generateJson<T>(opts: {
   }
   content.push({ type: "text", text: opts.prompt });
   const res = await anthropic().messages.create({
-    model: env().ANTHROPIC_MODEL,
-    max_tokens: opts.maxTokens ?? 4096,
+    model: plan ? env().ANTHROPIC_PLANNER_MODEL : env().ANTHROPIC_MODEL,
+    // Thinking tokens count toward max_tokens, so leave room above the JSON itself.
+    max_tokens: opts.maxTokens ?? (plan ? 8192 : 4096),
+    output_config: { effort: plan ? "medium" : "low" },
     system: `${opts.system}\n\nReply with a single JSON object and nothing else.`,
     messages: [{ role: "user", content }],
   });

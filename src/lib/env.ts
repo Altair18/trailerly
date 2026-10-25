@@ -10,7 +10,10 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_STORAGE_BUCKET: z.string().default("trailerly"),
   ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_MODEL: z.string().default("claude-sonnet-5-5"),
+  /** Brief, hooks and frame labelling: short, well-specified jobs that a small model handles. */
+  ANTHROPIC_MODEL: z.string().default("claude-haiku-5-5"),
+  /** Timeline planning, the hardest call. Same small model by default; set to claude-sonnet-5-5 if plans get worse. */
+  ANTHROPIC_PLANNER_MODEL: z.string().default("claude-haiku-5-5"),
   GEMINI_API_KEY: z.string().optional(),
   VEO_MODEL_LITE: z.string().default("veo-3.1-lite"),
   VEO_MODEL_FAST: z.string().default("veo-3.1-fast"),
