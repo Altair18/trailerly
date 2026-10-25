@@ -1,6 +1,6 @@
 import type { Brief } from "@/lib/schemas/brief";
 import type { Clip } from "@/lib/schemas/clips";
-import type { Screenshot } from "@/lib/media/screenshots";
+import { SCREENSHOT_SECONDS, type Screenshot } from "@/lib/media/screenshots";
 import { isPrivate } from "@/lib/schemas/clips";
 import { MAX_OVERLAY_WORDS } from "./enforce";
 import type { OutputSpec } from "@/lib/specs/outputs";
@@ -74,6 +74,19 @@ export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: stri
 }
 
 /**
+ * Clips the planner may use: clips that still show personal data are left out whenever the clean ones
+ * (plus any screenshots) reach the spec's minimum length. Otherwise all stay in and the prompt marks the private ones.
+ */
+export function safeClips<T extends Pick<Clip, "id" | "duration" | "notes">>(
+  clips: T[],
+  spec: Pick<OutputSpec, "minSeconds">,
+  extraSeconds = 0,
+): T[] {
+  const clean = clips.filter((c) => !isPrivate(c.notes));
+  return clean.reduce((n, c) => n + c.duration, 0) + extraSeconds >= spec.minSeconds ? clean : clips;
+}
+
+/**
  * Ask the model for a timeline, check it in code, and re-ask with the errors up to MAX_REPLANS times.
  * The App Store preview falls back to a code-built timeline so it never blocks the pack.
  */
@@ -82,6 +95,7 @@ export async function planTimeline(
   ctx: PlanContext,
   generate: Generate,
 ): Promise<{ timeline: Timeline; source: "model" | "fallback"; attempts: number }> {
+  ctx = { ...ctx, clips: safeClips(ctx.clips, spec, (ctx.screenshots?.length ?? 0) * SCREENSHOT_SECONDS) };
   const clipSeconds = Object.fromEntries(ctx.clips.map((c) => [c.id, c.duration]));
   const imageIds = (ctx.screenshots ?? []).map((s) => s.id);
   let feedback = "";

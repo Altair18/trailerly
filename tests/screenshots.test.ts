@@ -93,3 +93,15 @@ describe("screenshot mode", () => {
     expect(imageType(Buffer.from("RIFF0000WEBP"))).toBe("image/webp");
   });
 });
+
+describe("safeClips", () => {
+  it("drops private clips only when the rest (plus screenshots) is long enough", async () => {
+    const { safeClips } = await import("@/lib/timeline/plan");
+    const clips = [
+      { id: "a", duration: 10, notes: notes(4) },
+      { id: "b", duration: 10, notes: notes(5, true) },
+    ];
+    expect(safeClips(clips, { minSeconds: 15 }).map((c) => c.id)).toEqual(["a", "b"]);
+    expect(safeClips(clips, { minSeconds: 15 }, 6).map((c) => c.id)).toEqual(["a"]);
+  });
+});

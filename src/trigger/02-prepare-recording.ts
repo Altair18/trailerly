@@ -80,10 +80,10 @@ export const prepareRecording = task({
   },
 });
 
-/** Two frames per clip (a quarter and three quarters in) for the vision check. */
+/** Three frames per clip (start, middle, end) so the privacy boxes cover content that scrolls. */
 async function sampleFrames(clipFile: string, dir: string, n: number, duration: number): Promise<Buffer[]> {
   const out: Buffer[] = [];
-  for (const [k, at] of [duration * 0.25, duration * 0.75].entries()) {
+  for (const [k, at] of [duration * 0.15, duration * 0.5, duration * 0.85].entries()) {
     const file = join(dir, `clip-${n}-f${k}.jpg`);
     await frameAt(clipFile, file, at);
     out.push(await readFile(file));
