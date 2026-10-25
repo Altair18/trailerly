@@ -53,6 +53,7 @@ Stage 2 (`prepare-recording`) runs when the upload lands.
 ## Status
 
 - **M1 (text only):** magic-link sign-in → paste a link → editable brief and 10 rule-checked hooks. Pick up to 5 social hooks and 1 headline.
+- **M2 (zero AI video cost):** upload a 20–60 s recording → ffmpeg normalises to 30 fps and cuts 3–6 clips at screen changes → the App Store preview timeline is planned (model, checked in code, code-built fallback) → Remotion renders a watermarked draft at a third of full size, with a live player and rule results on the drafts screen.
 
 ## Getting started
 
@@ -69,6 +70,10 @@ For M1 you need: a Supabase project (URL, anon key, service role key), `ANTHROPI
 and a Trigger.dev project (`TRIGGER_PROJECT_REF`, `TRIGGER_SECRET_KEY`). In Supabase Auth, add
 `http://localhost:3000/auth/callback` to the redirect URLs. Run `npm run trigger:dev` alongside
 `npm run dev`, and add the same env vars to the Trigger.dev project for deployed runs.
+
+M2 adds a private storage bucket (`trailerly`, created by migration 0003) and renders on the
+Trigger.dev worker (ffmpeg build extension; Remotion downloads its headless browser on first render).
+Locally, set `REMOTION_BROWSER_EXECUTABLE` to use an existing Chrome headless shell.
 
 Database: create a Supabase project, then `supabase link` and `supabase db push`
 to apply `supabase/migrations/0001_init.sql`. Replace `src/types/db.ts` with

@@ -1,21 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { AppLine } from "@/components/AppLine";
 import { Close, Down, Up } from "@/components/Icons";
 import { type PackStep, TopBar } from "@/components/TopBar";
 import { accent, tile } from "@/lib/palette";
 import type { Brief } from "@/lib/schemas/brief";
 import { type ChosenHooks, type Hook, MAX_SOCIAL_HOOKS } from "@/lib/schemas/hooks";
 import type { PackStage } from "@/types/db";
+import { type PackState, usePack } from "./usePack";
 
-interface PackState {
-  stage: PackStage;
-  stage_error: string | null;
-  brief_json: Brief | null;
-  hooks_json: Hook[] | null;
-  chosen_hooks: ChosenHooks | null;
-  app: { name: string; icon_url: string | null } | null;
-}
+const pipelineBusy = (p: PackState) => p.stage !== "review" && p.stage !== "error";
 
 const PIPELINE: Array<{ stage: PackStage; label: string }> = [
   { stage: "ingesting", label: "Listing and reviews" },
@@ -24,26 +20,8 @@ const PIPELINE: Array<{ stage: PackStage; label: string }> = [
 ];
 
 export function PackReview({ packId }: { packId: string }) {
-  const [pack, setPack] = useState<PackState | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { pack, error: loadError } = usePack(packId, pipelineBusy);
   const [view, setView] = useState<"brief" | "hooks">("brief");
-
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/packs/${packId}`);
-    if (!res.ok) return setLoadError(res.status === 404 ? "Pack not found." : "Couldn't load the pack.");
-    setPack((await res.json()) as PackState);
-  }, [packId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Poll while the pipeline is running.
-  useEffect(() => {
-    if (!pack || pack.stage === "review" || pack.stage === "error") return;
-    const t = setTimeout(load, 2000);
-    return () => clearTimeout(t);
-  }, [pack, load]);
 
   const ready = pack?.stage === "review" && pack.brief_json && pack.hooks_json;
   const step: PackStep = ready && view === "hooks" ? "Hooks" : "Brief";
@@ -73,21 +51,6 @@ export function PackReview({ packId }: { packId: string }) {
         )}
       </main>
     </>
-  );
-}
-
-function AppLine({ app, step }: { app: PackState["app"]; step: number }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-      {app?.icon_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={app.icon_url} alt="" width={28} height={28} style={{ borderRadius: 8 }} />
-      ) : (
-        <span style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(150deg,#B8F23A,#2EE6A6)" }} />
-      )}
-      <span style={{ fontWeight: 600 }}>{app?.name ?? "Your app"}</span>
-      <span className="mu">· step {step} of 8</span>
-    </div>
   );
 }
 
@@ -326,6 +289,7 @@ function HookPicker({
   const [headline, setHeadline] = useState<string | null>(initial?.headline ?? null);
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
   function toggle(text: string) {
     if (mode === "head") return setHeadline(headline === text ? null : text);
@@ -334,11 +298,18 @@ function HookPicker({
     );
   }
 
-  async function save() {
+  async function makeDrafts() {
     setSaving(true);
+    setStatus(null);
     const problem = await patch(packId, { chosen: { social, headline } });
+    if (problem) {
+      setSaving(false);
+      return setStatus(problem);
+    }
+    const res = await fetch(`/api/packs/${packId}/drafts`, { method: "POST" });
+    if (res.ok) return router.push(`/packs/${packId}/drafts`);
     setSaving(false);
-    setStatus(problem ?? "Saved. Drafts come in the next phase.");
+    setStatus(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't start the drafts.");
   }
 
   const anySelected = mode === "ads" ? social.length > 0 : headline !== null;
@@ -411,12 +382,12 @@ function HookPicker({
             {social.length} {social.length === 1 ? "ad" : "ads"}, {headline ? "1 headline" : "no headline yet"}.
           </b>{" "}
           <span className="mu">
-            {status ?? (social.length > 0 && headline ? "Ready to save." : "Pick at least one ad and a headline.")}
+            {status ?? (headline ? "This phase drafts the App Store preview from your headline." : "Pick a headline to make the drafts.")}
           </span>
         </span>
         <button className="btn btn-ghost" type="button" onClick={onBack}>Back to brief</button>
-        <button className="btn btn-primary" type="button" onClick={save} disabled={saving || social.length === 0 || !headline}>
-          {saving ? "Saving…" : "Save picks"}
+        <button className="btn btn-primary" type="button" onClick={makeDrafts} disabled={saving || !headline}>
+          {saving ? "Starting…" : "Make my drafts"}
         </button>
       </div>
     </>

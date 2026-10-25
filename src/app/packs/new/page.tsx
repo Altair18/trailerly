@@ -25,7 +25,7 @@ export default function NewPack() {
     if (res.status === 401) return router.push("/login?next=/packs/new");
     setBusy(false);
     if (!res.ok || !body.packId) return setError(body.error ?? "Something went wrong");
-    router.push(`/packs/${body.packId}`);
+    router.push(`/packs/${body.packId}/recording`);
   }
 
   return (

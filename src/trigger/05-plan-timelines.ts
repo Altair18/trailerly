@@ -1,39 +1,44 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { generateJson } from "@/lib/llm/claude";
+import { loadPackWithApp, readyClips } from "@/lib/packs";
+import { Brief } from "@/lib/schemas/brief";
+import { ChosenHooks } from "@/lib/schemas/hooks";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
-import { enforceSpec } from "@/lib/timeline/enforce";
+import { PLANNER_SYSTEM, planTimeline } from "@/lib/timeline/plan";
 import { Timeline } from "@/lib/timeline/schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { PackPayload } from "./payload";
-
-const MAX_REPLANS = 2;
 
 /** Stage 5: the model plans a timeline per output; code enforces the spec and re-asks with errors. */
 export const planTimelines = task({
   id: "plan-timelines",
-  run: async ({ packId, context }: PackPayload & { context: unknown }) => {
+  run: async ({ packId, specs }: PackPayload & { specs: OutputSpecId[] }) => {
+    const db = supabaseAdmin();
+    const { pack } = await loadPackWithApp(packId);
+    const brief = Brief.parse(pack.brief_json);
+    const chosen = ChosenHooks.parse(pack.chosen_hooks ?? { social: [], headline: null });
+    const clips = await readyClips(packId);
+    if (clips.length === 0) throw new Error("The recording isn't ready yet.");
+
     const timelines: Partial<Record<OutputSpecId, Timeline>> = {};
+    for (const id of specs) {
+      const spec = OUTPUT_SPECS[id];
+      await db.from("outputs").upsert({ pack_id: packId, spec: id, status: "planning", error: null }, { onConflict: "pack_id,spec" });
 
-    for (const spec of Object.values(OUTPUT_SPECS)) {
-      let feedback = "";
-      for (let attempt = 0; attempt <= MAX_REPLANS; attempt++) {
-        const timeline = await generateJson({
-          schema: Timeline,
-          system:
-            "You plan short app videos as a list of segments " +
-            "{type: screen | ai_scene | text | end_card, start, duration, clip_id or prompt, text}.",
-          prompt: JSON.stringify({ spec, context, feedback }),
-        });
-        const errors = enforceSpec(timeline, spec);
-        if (errors.length === 0) {
-          timelines[spec.id] = timeline;
-          break;
-        }
-        feedback = `Your last plan broke these rules: ${errors.join(" ")}`;
-      }
-      if (!timelines[spec.id]) logger.warn("Timeline failed spec after retries", { packId, spec: spec.id });
+      const socialIndex = id.startsWith("social_") ? Number(id.slice(-1)) - 1 : -1;
+      const { timeline, source, attempts } = await planTimeline(
+        spec,
+        { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips },
+        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt }),
+      );
+      timelines[id] = timeline;
+      await db
+        .from("outputs")
+        .update({ timeline_json: timeline, status: "queued", updated_at: new Date().toISOString() })
+        .eq("pack_id", packId)
+        .eq("spec", id);
+      logger.info("Timeline planned", { packId, spec: id, source, attempts });
     }
-
-    // TODO(M2): write outputs.timeline_json rows.
     return { timelines };
   },
 });

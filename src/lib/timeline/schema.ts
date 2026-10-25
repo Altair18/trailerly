@@ -8,8 +8,12 @@ export const Segment = z.object({
   start: z.number().min(0),
   duration: z.number().positive(),
   clip_id: z.string().optional(),
+  /** Seconds into the clip to start from (screen segments). */
+  clip_offset: z.number().min(0).optional(),
   prompt: z.string().optional(),
   text: z.string().optional(),
+  /** Text drawn over whatever is underneath, rather than a full-screen card. */
+  overlay: z.boolean().optional(),
 });
 export type Segment = z.infer<typeof Segment>;
 
