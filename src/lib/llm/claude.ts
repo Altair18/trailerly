@@ -27,12 +27,12 @@ export async function generateJson<T>(opts: {
   /** JPEG frames to show the model before the prompt. */
   images?: { data: Buffer; label?: string }[];
   /**
-   * "light" (default): brief, hooks and labels on ANTHROPIC_MODEL at low effort.
-   * "plan": timelines on ANTHROPIC_PLANNER_MODEL at medium effort, since the code re-asks on mistakes.
+   * "write" (default): brief, hooks and timelines, the copy and cuts people see. ANTHROPIC_MODEL at medium effort.
+   * "label": describing clips and screenshots from images, the bulk of the tokens. ANTHROPIC_VISION_MODEL at low effort.
    */
-  job?: "light" | "plan";
+  job?: "write" | "label";
 }): Promise<T> {
-  const plan = opts.job === "plan";
+  const label = opts.job === "label";
   const content: Anthropic.ContentBlockParam[] = [];
   for (const img of opts.images ?? []) {
     if (img.label) content.push({ type: "text", text: img.label });
@@ -40,10 +40,11 @@ export async function generateJson<T>(opts: {
   }
   content.push({ type: "text", text: opts.prompt });
   const res = await anthropic().messages.create({
-    model: plan ? env().ANTHROPIC_PLANNER_MODEL : env().ANTHROPIC_MODEL,
+    model: label ? env().ANTHROPIC_VISION_MODEL : env().ANTHROPIC_MODEL,
     // Thinking tokens count toward max_tokens, so leave room above the JSON itself.
-    max_tokens: opts.maxTokens ?? (plan ? 8192 : 4096),
-    output_config: { effort: plan ? "medium" : "low" },
+    max_tokens: opts.maxTokens ?? (label ? 4096 : 8192),
+    // Medium is a step down from Sonnet's default (high) that keeps quality on these short jobs.
+    output_config: { effort: label ? "low" : "medium" },
     system: `${opts.system}\n\nReply with a single JSON object and nothing else.`,
     messages: [{ role: "user", content }],
   });

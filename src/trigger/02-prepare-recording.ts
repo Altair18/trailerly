@@ -60,7 +60,7 @@ export const prepareRecording = task({
         const { data: pack } = await db.from("packs").select("brief_json").eq("id", packId).single();
         const brief = Brief.safeParse(pack?.brief_json);
         const notes = await analyseClips(frames, brief.success ? brief.data.features : [], (opts) =>
-          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048 }),
+          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048, job: "label" }),
         );
         for (const clip of clips) if (notes[clip.id]) clip.notes = notes[clip.id];
         await blurPrivateClips(clips, dir, packId, await probe(norm));

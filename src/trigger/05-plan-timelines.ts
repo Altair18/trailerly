@@ -33,7 +33,7 @@ export const planTimelines = task({
     if (screenshots.length > 0) {
       try {
         screenshots = await labelScreenshots(screenshots, brief.features, (opts) =>
-          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048 }),
+          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048, job: "label" }),
         );
       } catch (err) {
         logger.warn("Couldn't label screenshots; planning without labels", { packId, error: (err as Error).message });
@@ -49,7 +49,7 @@ export const planTimelines = task({
       const { timeline, source, attempts } = await planTimeline(
         spec,
         { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips, screenshots },
-        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt, job: "plan" }),
+        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt }),
       );
       timelines[id] = timeline;
       await db
