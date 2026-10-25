@@ -10,6 +10,7 @@ export const paths = {
   clip: (packId: string, n: number) => `packs/${packId}/clips/clip-${n}.mp4`,
   poster: (packId: string, n: number) => `packs/${packId}/clips/clip-${n}.jpg`,
   draft: (packId: string, spec: string) => `packs/${packId}/drafts/${spec}.mp4`,
+  draftStill: (packId: string, still: string) => `packs/${packId}/drafts/still-${still}.png`,
 };
 
 export async function createUploadUrl(path: string) {

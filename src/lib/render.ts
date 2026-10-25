@@ -1,5 +1,8 @@
+import { rm } from "node:fs/promises";
 import path from "node:path";
+import { flattenPng } from "@/lib/media/ffmpeg";
 import type { OutputSpecId } from "@/lib/specs/outputs";
+import { stillCompositionId, type StillId } from "@/lib/specs/stills";
 import { compositionId, type RenderProps } from "@/remotion/Root";
 
 let bundled: Promise<string> | undefined;
@@ -42,4 +45,25 @@ export async function renderOutput(opts: {
     browserExecutable,
     onProgress: ({ progress }) => opts.onProgress?.(progress),
   });
+}
+
+/** Render one frame of a still composition to an RGB PNG (no alpha). */
+export async function renderStillImage(opts: { still: StillId; props: RenderProps; frame: number; outFile: string }): Promise<void> {
+  const { renderStill, selectComposition } = await import("@remotion/renderer");
+  const serveUrl = await bundleOnce();
+  const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || null;
+  const id = stillCompositionId(opts.still);
+  const composition = await selectComposition({ serveUrl, id, inputProps: opts.props, browserExecutable });
+  const raw = `${opts.outFile}.raw.png`;
+  await renderStill({
+    serveUrl,
+    composition,
+    inputProps: opts.props,
+    frame: Math.min(Math.max(0, opts.frame), composition.durationInFrames - 1),
+    imageFormat: "png",
+    output: raw,
+    browserExecutable,
+  });
+  await flattenPng(raw, opts.outFile);
+  await rm(raw, { force: true });
 }

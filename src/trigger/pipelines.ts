@@ -40,8 +40,8 @@ export const renderDrafts = task({
     const specs = DRAFT_SPECS;
     await planTimelines.triggerAndWait({ packId, specs }).unwrap();
     // generateScenes (M3) and voiceCaptions (M5) join here once their outputs are in DRAFT_SPECS.
-    await compose.triggerAndWait({ packId, specs, final: false }).unwrap();
-    return checkRules.triggerAndWait({ packId, specs }).unwrap();
+    const { rendered } = await compose.triggerAndWait({ packId, specs, final: false }).unwrap();
+    return checkRules.triggerAndWait({ packId, specs: rendered }).unwrap();
   },
 });
 

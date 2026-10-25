@@ -32,6 +32,13 @@ export interface OutputSpec {
   minScreenShare: number;
   loop: boolean;
   fileName: string;
+  /** Length the code-built fallback aims for (seconds). */
+  targetSeconds: number;
+  /**
+   * Centred box (fractions of width and height) that every device crop keeps. Text and the focal point stay inside it.
+   * Header and search are cropped differently on iPhone, iPad and Mac.
+   */
+  safeArea?: { w: number; h: number };
 }
 
 const social = (n: 1 | 2 | 3 | 4 | 5): OutputSpec => ({
@@ -49,6 +56,7 @@ const social = (n: 1 | 2 | 3 | 4 | 5): OutputSpec => ({
   minScreenShare: 0.4,
   loop: false,
   fileName: `social-ad-${n}-9x16.mp4`,
+  targetSeconds: 20,
 });
 
 export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
@@ -68,6 +76,7 @@ export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
     minScreenShare: 0,
     loop: false,
     fileName: "appstore-preview-886x1920.mp4",
+    targetSeconds: 30,
   },
   header: {
     id: "header",
@@ -84,6 +93,9 @@ export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
     minScreenShare: 0,
     loop: true,
     fileName: "appstore-header-21x9.mp4",
+    targetSeconds: 12,
+    // Apple's template: about 1646 x 661 in the middle of 3840 x 1646.
+    safeArea: { w: 1646 / 3840, h: 661 / 1646 },
   },
   search: {
     id: "search",
@@ -100,6 +112,9 @@ export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
     minScreenShare: 0,
     loop: false,
     fileName: "appstore-search-3x2.mp4",
+    targetSeconds: 10,
+    // Apple's template: about 2168 x 1030 in the middle of 3840 x 2560.
+    safeArea: { w: 2168 / 3840, h: 1030 / 2560 },
   },
   social_1: social(1),
   social_2: social(2),
@@ -113,5 +128,8 @@ export const PACK_OUTPUTS = Object.keys(OUTPUT_SPECS) as OutputSpecId[];
 /** Drafts render at a third of full size. */
 export const DRAFT_SCALE = 1 / 3;
 
-/** Outputs the drafts run produces so far; grows with each milestone (M3: header + search, M5: social). */
-export const DRAFT_SPECS: OutputSpecId[] = ["preview"];
+/** Outputs the drafts run produces so far; grows with each milestone (M5: social). */
+export const DRAFT_SPECS: OutputSpecId[] = ["preview", "header", "search"];
+
+/** Landscape outputs (header, search) lay the portrait recording out on a stage instead of filling the frame. */
+export const isLandscape = (spec: Pick<OutputSpec, "width" | "height">) => spec.width > spec.height;

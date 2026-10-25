@@ -382,7 +382,7 @@ function HookPicker({
             {social.length} {social.length === 1 ? "ad" : "ads"}, {headline ? "1 headline" : "no headline yet"}.
           </b>{" "}
           <span className="mu">
-            {status ?? (headline ? "This phase drafts the App Store preview from your headline." : "Pick a headline to make the drafts.")}
+            {status ?? (headline ? "Drafts the App Store preview, plus the iOS 27 header and search videos and stills, from your headline." : "Pick a headline to make the drafts.")}
           </span>
         </span>
         <button className="btn btn-ghost" type="button" onClick={onBack}>Back to brief</button>
