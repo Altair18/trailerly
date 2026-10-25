@@ -1,5 +1,5 @@
 import type { Brief } from "@/lib/schemas/brief";
-import type { Clip } from "@/lib/schemas/clips";
+import { type Clip, showsPersonalData } from "@/lib/schemas/clips";
 import { MAX_OVERLAY_WORDS } from "./enforce";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { enforceSpec } from "./enforce";
@@ -57,10 +57,19 @@ export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: stri
       shows: c.notes?.label,
       feature: c.notes?.feature ?? undefined,
       interest: c.notes?.interest,
-      personal_info: c.notes?.personal_info || undefined,
+      personal_info: showsPersonalData(c) || undefined,
     })),
     fix_these_errors_from_your_last_plan: feedback || undefined,
   });
+}
+
+/**
+ * Clips the planner may use: clips that still show personal data are left out whenever the rest
+ * can reach the spec's minimum length. Otherwise all clips stay in, and the prompt marks the private ones.
+ */
+export function safeClips<T extends Pick<Clip, "id" | "duration" | "notes">>(clips: T[], spec: Pick<OutputSpec, "minSeconds">): T[] {
+  const clean = clips.filter((c) => !showsPersonalData(c));
+  return clean.reduce((n, c) => n + c.duration, 0) >= spec.minSeconds ? clean : clips;
 }
 
 /**
@@ -72,6 +81,7 @@ export async function planTimeline(
   ctx: PlanContext,
   generate: Generate,
 ): Promise<{ timeline: Timeline; source: "model" | "fallback"; attempts: number }> {
+  ctx = { ...ctx, clips: safeClips(ctx.clips, spec) };
   const clipSeconds = Object.fromEntries(ctx.clips.map((c) => [c.id, c.duration]));
   let feedback = "";
   for (let attempt = 1; attempt <= MAX_REPLANS + 1; attempt++) {

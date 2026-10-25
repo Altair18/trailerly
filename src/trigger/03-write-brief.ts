@@ -1,7 +1,8 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { verifyReviewPhrases } from "@/lib/brief";
 import { generateJson } from "@/lib/llm/claude";
-import { Brief } from "@/lib/schemas/brief";
+import { type Brief, BriefDraft } from "@/lib/schemas/brief";
+import { fitsWordLimit } from "@/lib/schemas/hooks";
 import type { Listing, Review } from "@/lib/schemas/listing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { PackPayload } from "./payload";
@@ -21,14 +22,16 @@ export const writeBrief = task({
   id: "write-brief",
   run: async ({ packId, listing, reviews }: PackPayload & { listing: Listing; reviews: Review[] }) => {
     const draft = await generateJson({
-      schema: Brief,
+      schema: BriefDraft,
       system: SYSTEM,
       prompt: JSON.stringify({
         listing: { name: listing.name, genre: listing.genre, description: listing.description },
         reviews: reviews.map((r) => ({ stars: r.stars, text: r.text })),
       }),
     });
-    const brief: Brief = { ...draft, review_phrases: verifyReviewPhrases(draft.review_phrases, reviews) };
+    // Drop over-long phrases and any that don't really repeat across reviews; keep the cap of 10.
+    const phrases = verifyReviewPhrases(draft.review_phrases.filter((p) => fitsWordLimit(p)), reviews).slice(0, 10);
+    const brief: Brief = { ...draft, review_phrases: phrases };
 
     const { error } = await supabaseAdmin().from("packs").update({ brief_json: brief }).eq("id", packId);
     if (error) throw error;
