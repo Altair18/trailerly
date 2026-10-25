@@ -108,3 +108,42 @@ describe("blur boxes", () => {
     expect(r!.x + r!.w).toBeCloseTo(0.63);
   });
 });
+
+describe("draft quality fixes", () => {
+  it("keeps a short lead-in like POV: with the line after it", async () => {
+    const { shortLine } = await import("@/lib/timeline/preview");
+    expect(shortLine("POV: you finally know when to water")).toBe("POV: you finally know when to water");
+    expect(shortLine("Stop guessing. Start growing.")).toBe("Stop guessing");
+    expect(shortLine("Your plants, sorted: no more guessing")).toBe("Your plants, sorted");
+  });
+
+  it("reads black stretches and merges them with frozen ones", async () => {
+    const { parseBlacks, mergeSpans } = await import("@/lib/media/ffmpeg");
+    const blacks = parseBlacks("[blackdetect @ 0x1] black_start:0 black_end:1.4 black_duration:1.4\n");
+    expect(blacks).toEqual([{ start: 0, duration: 1.4 }]);
+    expect(mergeSpans([...blacks, { start: 1.2, duration: 1.3 }, { start: 5, duration: 1 }])).toEqual([
+      { start: 0, duration: 2.5 },
+      { start: 5, duration: 1 },
+    ]);
+  });
+
+  it("moves a shot that opens on dead time to the live part of the clip", async () => {
+    const { skipDeadStarts } = await import("@/lib/timeline/dead-time");
+    const clips = [
+      { id: "clip_1", duration: 8, idle: [{ start: 0, duration: 2 }] },
+      { id: "clip_2", duration: 4, idle: [{ start: 0, duration: 2 }] },
+    ];
+    const t = skipDeadStarts(
+      {
+        segments: [
+          { type: "screen", start: 0, duration: 5, clip_id: "clip_1" },
+          { type: "screen", start: 5, duration: 4, clip_id: "clip_2" },
+        ],
+      },
+      clips,
+    );
+    expect(t.segments[0]!.clip_offset).toBe(2);
+    // No room to shift: left as planned.
+    expect(t.segments[1]!.clip_offset).toBeUndefined();
+  });
+});

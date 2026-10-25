@@ -8,6 +8,7 @@ import { Brief } from "@/lib/schemas/brief";
 import { isPrivate } from "@/lib/schemas/clips";
 import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
+import { skipDeadStarts } from "@/lib/timeline/dead-time";
 import { enforceSpec } from "@/lib/timeline/enforce";
 import { PLANNER_SYSTEM, planTimeline } from "@/lib/timeline/plan";
 import { fallbackTimeline } from "@/lib/timeline/preview";
@@ -72,18 +73,20 @@ export const planTimelines = task({
       }
 
       const socialIndex = id.startsWith("social_") ? Number(id.slice(-1)) - 1 : -1;
-      const { timeline, source, attempts } = await planTimeline(
+      const planned = await planTimeline(
         spec,
         { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips, screenshots },
         (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt, tier: "smart" }),
       );
+      // Never open a shot on a loading screen or a frozen stretch when the clip has better footage after it.
+      const timeline = skipDeadStarts(planned.timeline, clips);
       timelines[id] = timeline;
       await db
         .from("outputs")
         .update({ timeline_json: timeline, status: "queued", updated_at: new Date().toISOString() })
         .eq("pack_id", packId)
         .eq("spec", id);
-      logger.info("Timeline planned", { packId, spec: id, source, attempts });
+      logger.info("Timeline planned", { packId, spec: id, source: planned.source, attempts: planned.attempts });
     }
     return { timelines };
   },

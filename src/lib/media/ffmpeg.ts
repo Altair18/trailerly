@@ -176,14 +176,45 @@ export function parseFreezes(log: string, duration: number): Span[] {
   return spans.map((s) => ({ start: Math.round(s.start * 100) / 100, duration: Math.round(s.duration * 100) / 100 })).filter((s) => s.duration > 0);
 }
 
-/** Stretches of at least `min` seconds where nothing on screen changes (dead time). */
+/** Read ffmpeg blackdetect output into dark stretches (loading and blank screens). */
+export function parseBlacks(log: string): Span[] {
+  const spans: Span[] = [];
+  for (const m of log.matchAll(/black_start:\s*([\d.]+)\s+black_end:\s*([\d.]+)/g)) {
+    const start = Number(m[1]);
+    const end = Number(m[2]);
+    if (end > start) spans.push({ start: Math.round(start * 100) / 100, duration: Math.round((end - start) * 100) / 100 });
+  }
+  return spans;
+}
+
+/** Union of spans, sorted, with touching or overlapping spans joined. */
+export function mergeSpans(spans: Span[]): Span[] {
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const out: Span[] = [];
+  for (const s of sorted) {
+    const last = out[out.length - 1];
+    if (last && s.start <= last.start + last.duration + 0.05) {
+      last.duration = Math.round((Math.max(last.start + last.duration, s.start + s.duration) - last.start) * 100) / 100;
+    } else out.push({ ...s });
+  }
+  return out;
+}
+
+/**
+ * Dead time: stretches of at least `min` seconds where nothing on screen changes, plus stretches of at least
+ * half a second where the screen is (nearly) black, such as a launch or loading screen.
+ */
 export async function idleSpans(input: string, duration: number, min = 1.2): Promise<Span[]> {
   const { stderr } = await run(
     "ffmpeg",
-    ["-hide_banner", "-v", "info", "-i", input, "-map", "0:v:0", "-vf", `freezedetect=n=0.003:d=${min}`, "-f", "null", "-"],
+    [
+      "-hide_banner", "-v", "info", "-i", input, "-map", "0:v:0",
+      "-vf", `freezedetect=n=0.003:d=${min},blackdetect=d=0.5:pic_th=0.9:pix_th=0.12`,
+      "-f", "null", "-",
+    ],
     { maxBuffer: MAX_BUFFER },
   );
-  return parseFreezes(stderr, duration);
+  return mergeSpans([...parseFreezes(stderr, duration), ...parseBlacks(stderr)]);
 }
 
 /** Re-save an image as an RGB PNG with no alpha channel (App Store Connect rejects transparency). */
