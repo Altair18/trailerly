@@ -3,23 +3,19 @@ import { z } from "zod";
 export const HookFormat = z.enum(["pov", "problem", "before_after", "list", "question"]);
 
 export const MAX_HOOK_WORDS = 8;
-export const fitsWordLimit = (text: string, max = MAX_HOOK_WORDS) => text.trim().split(/\s+/).length <= max;
+export const hookWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
 
 export const Hook = z.object({
-  text: z.string().refine((t) => fitsWordLimit(t), `${MAX_HOOK_WORDS} words or fewer`),
+  text: z.string().refine((t) => hookWords(t) <= MAX_HOOK_WORDS, `${MAX_HOOK_WORDS} words or fewer`),
   format: HookFormat,
 });
 export type Hook = z.infer<typeof Hook>;
 
-/** A hook as the model wrote it, before the word limit is checked. */
-export const HookDraft = z.object({ text: z.string(), format: HookFormat });
-export type HookDraft = z.infer<typeof HookDraft>;
-
 /**
- * What the model returns per call; the pipeline tops up to HOOK_COUNT across calls.
- * Lenient on length so one over-long hook is dropped and re-asked for, rather than failing the batch.
+ * What the model returns per call. Lenient on length on purpose: one over-long hook must not
+ * throw away the whole batch; collectHooks drops it and tells the model on the next round.
  */
-export const HookSet = z.object({ hooks: z.array(HookDraft).min(1).max(10) });
+export const HookSet = z.object({ hooks: z.array(z.object({ text: z.string(), format: HookFormat })).min(1).max(20) });
 export type HookSet = z.infer<typeof HookSet>;
 
 export const HOOK_COUNT = 10;

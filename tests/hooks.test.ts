@@ -21,22 +21,6 @@ describe("collectHooks", () => {
     expect(calls[1]).toEqual({ count: 2, rejected: ["Only $4.99 today"] });
   });
 
-  it("drops over-long hooks and asks again instead of failing the batch", async () => {
-    const calls: Array<{ count: number; rejected: string[] }> = [];
-    const long = "This hook has far too many words to fit on screen";
-    const batches = [
-      [...Array.from({ length: 9 }, (_, i) => hook(`Short hook ${i}`)), hook(long)],
-      [hook("Short hook 9")],
-    ];
-    const result = await collectHooks(async (args) => {
-      calls.push({ count: args.count, rejected: [...args.rejected] });
-      return batches[calls.length - 1] ?? [];
-    });
-    expect(result).toHaveLength(10);
-    expect(result.map((h) => h.text)).not.toContain(long);
-    expect(calls[1]).toEqual({ count: 1, rejected: [`${long} (over 8 words)`] });
-  });
-
   it("gives up after three rounds", async () => {
     let n = 0;
     const result = await collectHooks(async () => {
@@ -63,5 +47,30 @@ describe("validateChosen", () => {
   it("rejects unknown or repeated picks", () => {
     expect(validateChosen({ social: ["Z"], headline: null }, proposed)).toMatch(/isn't one/);
     expect(validateChosen({ social: ["A", "A"], headline: null }, proposed)).toMatch(/once/);
+  });
+});
+
+describe("collectHooks length", () => {
+  it("drops over-long hooks instead of failing the batch, and re-asks", async () => {
+    const { collectHooks } = await import("@/lib/hooks");
+    let calls = 0;
+    const rejectedSeen: string[][] = [];
+    const hooks = await collectHooks(
+      async ({ count, rejected }) => {
+        calls++;
+        rejectedSeen.push(rejected);
+        if (calls === 1) {
+          return [
+            { text: "This hook is far too long to fit on one screen", format: "problem" },
+            ...Array.from({ length: 5 }, (_, i) => ({ text: `Short hook ${i}`, format: "pov" as const })),
+          ];
+        }
+        return Array.from({ length: count }, (_, i) => ({ text: `More hook ${i}`, format: "list" as const }));
+      },
+      async () => true,
+    );
+    expect(hooks).toHaveLength(10);
+    expect(hooks.every((h) => h.text.split(" ").length <= 8)).toBe(true);
+    expect(rejectedSeen[1]?.[0]).toMatch(/over 8 words/);
   });
 });

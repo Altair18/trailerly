@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<Output["status"], string> = {
 
 const COMING: Partial<Record<OutputSpecId, string>> = { header: "Phase 3", search: "Phase 3" };
 
-const SEG_COLOUR = { screen: "var(--seg-screen)", ai_scene: "var(--seg-ai)", text: "var(--seg-text)", end_card: "var(--seg-end)" } as const;
+const SEG_COLOUR = { screen: "var(--seg-screen)", screenshot: "var(--mint)", ai_scene: "var(--seg-ai)", text: "var(--seg-text)", end_card: "var(--seg-end)" } as const;
 
 export function Drafts({ packId }: { packId: string }) {
   const { pack, error, reload } = usePack(packId, busy);
@@ -177,13 +177,13 @@ function Detail({ output, clips, onRetry, retrying }: { output: Output; clips: A
             <span className="lab mu">Timeline · {total.toFixed(1)} s</span>
             <div className="tl" aria-label="Overlays">
               {timeline.segments.filter(isOverlay).map((s, i) => (
-                <span key={i} className="seg-block" style={{ left: `${(s.start / total) * 100}%`, width: `${(s.duration / total) * 100}%`, background: SEG_COLOUR.text }} title={s.text}>T {s.text}</span>
+                <span key={i} className="seg-block" style={{ left: `${(s.start / total) * 100}%`, width: `${(s.duration / total) * 100}%`, background: SEG_COLOUR.text }} title={s.text}>T {s.text ?? s.style}</span>
               ))}
             </div>
             <div className="tl" aria-label="Segments">
               {timeline.segments.filter((s) => !isOverlay(s)).map((s, i) => (
                 <span key={i} className={`seg-block${s.type === "ai_scene" ? " ai" : ""}`} style={{ left: `${(s.start / total) * 100}%`, width: `${(s.duration / total) * 100}%`, background: SEG_COLOUR[s.type] }}>
-                  {s.type === "screen" ? `▯ ${s.clip_id?.replace("clip_", "Clip ")}` : s.type}
+                  {s.type === "screen" ? `▯ ${s.clip_id?.replace("clip_", "Clip ")}` : s.type === "screenshot" ? `▣ ${s.image_id?.replace("shot_", "Shot ")}` : s.type}
                 </span>
               ))}
             </div>
@@ -209,6 +209,7 @@ function Detail({ output, clips, onRetry, retrying }: { output: Output; clips: A
 
 const RULE_LABEL: Record<string, string> = {
   preview_no_ai_scene: "Screen capture only, no AI scenes",
+  preview_screenshots: "Real footage, not screenshots",
   length_in_spec: "Length in spec",
   no_prices: "No prices or offers",
   no_superlatives: "No rankings or awards",

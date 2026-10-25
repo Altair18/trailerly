@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SegmentType = z.enum(["screen", "ai_scene", "text", "end_card"]);
+export const SegmentType = z.enum(["screen", "screenshot", "ai_scene", "text", "end_card"]);
 export type SegmentType = z.infer<typeof SegmentType>;
 
 export const Segment = z.object({
@@ -8,6 +8,8 @@ export const Segment = z.object({
   start: z.number().min(0),
   duration: z.number().positive(),
   clip_id: z.string().optional(),
+  /** App Store screenshot to show (screenshot segments), e.g. "shot_2". */
+  image_id: z.string().optional(),
   /** Seconds into the clip to start from (screen segments). */
   clip_offset: z.number().min(0).optional(),
   prompt: z.string().optional(),

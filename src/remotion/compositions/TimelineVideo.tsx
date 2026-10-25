@@ -21,6 +21,8 @@ export interface TimelineVideoProps extends Record<string, unknown> {
   baseHeight: number;
   /** App name and icon for the brand overlay and end card. */
   brand?: Brand;
+  /** image_id -> URL of an App Store screenshot, for screenshot segments. */
+  imageUrls?: Record<string, string>;
 }
 
 const INK = "#0A0A0E";
@@ -33,7 +35,7 @@ const UI = { fontFamily: "Geist, system-ui, sans-serif" } as const;
 const ENTER_FRAMES = 8;
 const PUSH_IN = 0.06;
 
-export function TimelineVideo({ timeline, clipUrls, watermark, baseWidth, baseHeight, brand }: TimelineVideoProps) {
+export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, baseWidth, baseHeight, brand }: TimelineVideoProps) {
   useBrandFonts();
   const { fps, width } = useVideoConfig();
   const scale = width / baseWidth;
@@ -45,7 +47,7 @@ export function TimelineVideo({ timeline, clipUrls, watermark, baseWidth, baseHe
       <div style={{ position: "absolute", left: 0, top: 0, width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: "top left", overflow: "hidden" }}>
         {base.map((seg, i) => (
           <Sequence key={`b${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
-            <SegmentView segment={seg} clipUrls={clipUrls} brand={brand} index={i} width={baseWidth} />
+            <SegmentView segment={seg} clipUrls={clipUrls} imageUrls={imageUrls} brand={brand} index={i} width={baseWidth} />
           </Sequence>
         ))}
         {overlays.map((seg, i) => (
@@ -74,7 +76,21 @@ function useEntrance(index: number) {
   return { opacity: t, x: (1 - t) * 8 };
 }
 
-function SegmentView({ segment, clipUrls, brand, index, width }: { segment: Segment; clipUrls: Record<string, string>; brand?: Brand; index: number; width: number }) {
+function SegmentView({
+  segment,
+  clipUrls,
+  imageUrls,
+  brand,
+  index,
+  width,
+}: {
+  segment: Segment;
+  clipUrls: Record<string, string>;
+  imageUrls: Record<string, string>;
+  brand?: Brand;
+  index: number;
+  width: number;
+}) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const enter = useEntrance(index);
@@ -93,6 +109,10 @@ function SegmentView({ segment, clipUrls, brand, index, width }: { segment: Segm
       </AbsoluteFill>
     );
   }
+  const image = segment.image_id ? imageUrls[segment.image_id] : undefined;
+  if (segment.type === "screenshot" && image) {
+    return <ScreenshotView src={image} enter={enter} width={width} />;
+  }
   if (segment.type === "end_card") return <EndCard brand={brand} text={segment.text} width={width} />;
   if (segment.type === "text") {
     return (
@@ -102,6 +122,38 @@ function SegmentView({ segment, clipUrls, brand, index, width }: { segment: Segm
     );
   }
   return <AbsoluteFill style={{ backgroundColor: "#18181F" }} />;
+}
+
+/**
+ * A still App Store screenshot: a blurred, darkened copy fills the frame and the screenshot sits on top,
+ * whole, in a rounded phone-like frame that rises in and pushes in slowly.
+ */
+function ScreenshotView({ src, enter, width }: { src: string; enter: { opacity: number; x: number }; width: number }) {
+  const frame = useCurrentFrame();
+  const { fps, durationInFrames } = useVideoConfig();
+  const rise = spring({ frame, fps, config: { damping: 18, stiffness: 120 }, durationInFrames: 14 });
+  const zoom = 1 + PUSH_IN * interpolate(frame, [0, durationInFrames], [0, 1], { extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
+  const radius = Math.round(width * 0.045);
+  return (
+    <AbsoluteFill style={{ backgroundColor: INK, opacity: enter.opacity, overflow: "hidden" }}>
+      <Img src={src} style={{ position: "absolute", inset: "-10%", width: "120%", height: "120%", objectFit: "cover", filter: "blur(40px) saturate(1.3)" }} />
+      <AbsoluteFill style={{ backgroundColor: "rgba(10,10,14,0.55)" }} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <Img
+          src={src}
+          style={{
+            maxHeight: "82%",
+            maxWidth: "86%",
+            objectFit: "contain",
+            borderRadius: radius,
+            border: `${Math.max(2, Math.round(width * 0.008))}px solid rgba(255,255,255,0.14)`,
+            boxShadow: "0 30px 80px rgba(0,0,0,0.55)",
+            transform: `translate(${enter.x}%, ${(1 - rise) * 6}%) scale(${zoom * (0.94 + 0.06 * rise)})`,
+          }}
+        />
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
 }
 
 /** Font size that keeps a line inside the frame: shrinks as the text gets longer. */

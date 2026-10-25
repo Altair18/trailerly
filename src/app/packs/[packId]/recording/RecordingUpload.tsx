@@ -144,8 +144,8 @@ export function RecordingUpload({ packId }: { packId: string }) {
                     <span className="num" style={{ background: accent(i) }}>{i + 1}</span>
                     <span className="dur mono">{fmt(c.duration)}</span>
                     {c.notes?.personal_info && (
-                      <span className="mono" title={c.notes.blurred ? `Blurred: ${c.notes.privacy_note ?? "personal data"}` : c.notes.privacy_note ?? "Personal data"} style={{ position: "absolute", top: 8, right: 8, fontSize: 11, fontWeight: 700, padding: "3px 6px", borderRadius: 6, background: c.notes.blurred ? "var(--yellow, #FFE135)" : "var(--coral)", color: "var(--ink)" }}>
-                        {c.notes.blurred ? "BLURRED" : "PRIVATE"}
+                      <span className="mono" title={c.notes.privacy_note ?? "Personal data"} style={{ position: "absolute", top: 8, right: 8, fontSize: 11, fontWeight: 700, padding: "3px 6px", borderRadius: 6, background: "var(--coral)", color: "var(--ink)" }}>
+                        PRIVATE
                       </span>
                     )}
                   </div>
@@ -169,16 +169,11 @@ export function RecordingUpload({ packId }: { packId: string }) {
                 <span>{fmt(rec.duration_s ?? 0)}</span>
               </div>
             </div>
-            {rec.clips.some((c) => c.notes?.personal_info && !c.notes.blurred) && (
+            {rec.clips.some((c) => c.notes?.personal_info) && (
               <div role="alert" style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,90,78,.12)", border: "1px solid var(--coral)", fontSize: 14 }}>
-                <b>Some clips show personal data</b> ({rec.clips.filter((c) => c.notes?.personal_info && !c.notes.blurred).map((c) => c.notes?.privacy_note || c.id).join("; ")}).
+                <b>Some clips show personal data</b> ({rec.clips.filter((c) => c.notes?.personal_info).map((c) => c.notes?.privacy_note || c.id).join("; ")}).
                 We&apos;ll leave them out where we can. For the cleanest result, record again with demo data and notifications off.
               </div>
-            )}
-            {rec.clips.some((c) => c.notes?.blurred) && (
-              <p className="mu" style={{ margin: 0, fontSize: 14 }}>
-                We blurred the personal data we spotted in clips marked <b>BLURRED</b>. Check them before you use the videos; recording with demo data is still the safest.
-              </p>
             )}
             <p className="mu" style={{ margin: 0, fontSize: 14 }}>
               We split at screen changes and trim your phone&apos;s status and gesture bars. The App Store preview uses only these clips, never AI scenes.
@@ -190,7 +185,7 @@ export function RecordingUpload({ packId }: { packId: string }) {
         <div className="actionbar">
           <span style={{ flex: "1 1 260px" }}>
             <b>{state === "done" ? "Recording ready." : "No recording yet."}</b>{" "}
-            <span className="mu">{state === "done" ? "Next, check the brief and pick your hooks." : "You can check the brief while it uploads."}</span>
+            <span className="mu">{state === "done" ? "Next, check the brief and pick your hooks." : state === "empty" ? "No recording? We'll use your App Store screenshots instead." : "You can check the brief while it uploads."}</span>
           </span>
           <Link className="btn btn-primary" href={`/packs/${packId}`}>Check the brief</Link>
         </div>

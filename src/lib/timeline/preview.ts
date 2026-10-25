@@ -1,5 +1,6 @@
 import { rankClips } from "@/lib/media/analyse";
-import { type Clip, showsPersonalData } from "@/lib/schemas/clips";
+import { SCREENSHOT_SECONDS, type Screenshot } from "@/lib/media/screenshots";
+import { type Clip, isPrivate } from "@/lib/schemas/clips";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
 import type { Segment, Timeline } from "./schema";
@@ -17,21 +18,38 @@ export function shortLine(text: string, maxWords = MAX_OVERLAY_WORDS): string {
 
 /**
  * A safe App Store preview built in code: the best clips back to back (trimmed to the spec's
- * length), the headline over the opening seconds, and the app's name over the end.
+ * length), topped up with App Store screenshots when there isn't enough clean footage, the
+ * headline over the opening seconds, and the app's name over the end.
  * Used when the model's plan keeps failing.
  */
-export function fallbackPreview(clips: Pick<Clip, "id" | "duration" | "notes">[], headline: string | null, spec: OutputSpec): Timeline {
-  const usable = rankClips(clips);
-  const clean = usable.filter((c) => !showsPersonalData(c));
-  const pool = clean.reduce((n, c) => n + c.duration, 0) >= spec.minSeconds ? clean : usable;
-  const target = Math.min(spec.maxSeconds, pool.reduce((n, c) => n + c.duration, 0));
+export function fallbackPreview(
+  clips: Pick<Clip, "id" | "duration" | "notes">[],
+  headline: string | null,
+  spec: OutputSpec,
+  screenshots: Pick<Screenshot, "id" | "notes">[] = [],
+): Timeline {
+  const ranked = rankClips(clips);
+  const clean = ranked.filter((c) => !isPrivate(c.notes));
+  const shots = rankClips(screenshots);
+  const cleanSeconds = clean.reduce((n, c) => n + c.duration, 0);
+  const shotSeconds = shots.length * SCREENSHOT_SECONDS;
+  // Prefer clean footage + screenshots; fall back to private clips only when that's still too short.
+  const pool = cleanSeconds + shotSeconds >= spec.minSeconds || ranked.length === clean.length ? clean : ranked;
   const segments: Segment[] = [];
   let t = 0;
   for (const clip of pool) {
-    if (t >= target) break;
-    const duration = round(Math.min(clip.duration, target - t));
+    if (t >= spec.maxSeconds) break;
+    const duration = round(Math.min(clip.duration, spec.maxSeconds - t));
     if (duration < 0.5) break;
     segments.push({ type: "screen", start: round(t), duration, clip_id: clip.id, clip_offset: 0 });
+    t += duration;
+  }
+  // Top up to the minimum (or show a few if there's no footage at all) with screenshots.
+  const wanted = pool.length === 0 ? Math.max(spec.minSeconds, Math.min(spec.maxSeconds, shotSeconds)) : spec.minSeconds;
+  for (let i = 0; t < wanted - 0.01 && shots.length > 0; i++) {
+    const duration = round(Math.min(SCREENSHOT_SECONDS, spec.maxSeconds - t));
+    if (duration < 0.5) break;
+    segments.push({ type: "screenshot", start: round(t), duration, image_id: shots[i % shots.length]!.id });
     t += duration;
   }
   if (headline) {

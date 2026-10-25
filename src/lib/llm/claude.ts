@@ -30,7 +30,7 @@ export async function generateJson<T>(opts: {
   const content: Anthropic.ContentBlockParam[] = [];
   for (const img of opts.images ?? []) {
     if (img.label) content.push({ type: "text", text: img.label });
-    content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: img.data.toString("base64") } });
+    content.push({ type: "image", source: { type: "base64", media_type: imageType(img.data), data: img.data.toString("base64") } });
   }
   content.push({ type: "text", text: opts.prompt });
   const res = await anthropic().messages.create({
@@ -56,4 +56,12 @@ export async function generateJson<T>(opts: {
     throw new SchemaError(result.error.message, text);
   }
   return result.data;
+}
+
+/** Media type from the file's first bytes (App Store screenshots can be PNG, JPEG or WebP). */
+export function imageType(data: Buffer): "image/jpeg" | "image/png" | "image/webp" | "image/gif" {
+  if (data[0] === 0x89 && data[1] === 0x50) return "image/png";
+  if (data.subarray(0, 4).toString("ascii") === "RIFF" && data.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  if (data.subarray(0, 3).toString("ascii") === "GIF") return "image/gif";
+  return "image/jpeg";
 }

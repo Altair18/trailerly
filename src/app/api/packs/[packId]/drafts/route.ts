@@ -1,7 +1,9 @@
 import { tasks } from "@trigger.dev/sdk";
 import { NextResponse } from "next/server";
 import { ownedPack } from "@/lib/owned";
+import { appScreenshots } from "@/lib/media/screenshots";
 import { readyClips } from "@/lib/packs";
+import { Listing } from "@/lib/schemas/listing";
 import { ChosenHooks } from "@/lib/schemas/hooks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DRAFT_SPECS } from "@/lib/specs/outputs";
@@ -18,7 +20,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ packId
     return NextResponse.json({ error: "Pick a headline first." }, { status: 409 });
   }
   if ((await readyClips(pack.id)).length === 0) {
-    return NextResponse.json({ error: "Add a screen recording first." }, { status: 409 });
+    // No recording: drafts can still be made from the App Store screenshots.
+    const { data: app } = await supabaseAdmin().from("apps").select("listing_json").eq("id", pack.app_id).single();
+    const listing = Listing.safeParse(app?.listing_json);
+    if (appScreenshots(listing.success ? listing.data : null).length === 0) {
+      return NextResponse.json({ error: "Add a screen recording first." }, { status: 409 });
+    }
   }
 
   await supabaseAdmin()

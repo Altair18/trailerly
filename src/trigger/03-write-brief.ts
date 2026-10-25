@@ -2,7 +2,7 @@ import { logger, task } from "@trigger.dev/sdk";
 import { verifyReviewPhrases } from "@/lib/brief";
 import { generateJson } from "@/lib/llm/claude";
 import { type Brief, BriefDraft } from "@/lib/schemas/brief";
-import { fitsWordLimit } from "@/lib/schemas/hooks";
+import { hookWords } from "@/lib/schemas/hooks";
 import type { Listing, Review } from "@/lib/schemas/listing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { PackPayload } from "./payload";
@@ -30,7 +30,7 @@ export const writeBrief = task({
       }),
     });
     // Drop over-long phrases and any that don't really repeat across reviews; keep the cap of 10.
-    const phrases = verifyReviewPhrases(draft.review_phrases.filter((p) => fitsWordLimit(p)), reviews).slice(0, 10);
+    const phrases = verifyReviewPhrases(draft.review_phrases.filter((p) => hookWords(p) <= 8), reviews).slice(0, 10);
     const brief: Brief = { ...draft, review_phrases: phrases };
 
     const { error } = await supabaseAdmin().from("packs").update({ brief_json: brief }).eq("id", packId);
