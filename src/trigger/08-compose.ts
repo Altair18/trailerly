@@ -5,8 +5,9 @@ import { logger, metadata, task } from "@trigger.dev/sdk";
 import { appScreenshots } from "@/lib/media/screenshots";
 import { loadPackWithApp, readyClips } from "@/lib/packs";
 import { Listing } from "@/lib/schemas/listing";
-import { renderOutput } from "@/lib/render";
+import { renderOutput, renderStillImage } from "@/lib/render";
 import { DRAFT_SCALE, OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
+import { stillSecond, stillsFor } from "@/lib/specs/stills";
 import { paths, signedUrls, uploadFile } from "@/lib/storage";
 import { Timeline } from "@/lib/timeline/schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -30,6 +31,8 @@ export const compose = task({
     const listing = Listing.safeParse(app.listing_json);
     const imageUrls = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
 
+    const rendered: OutputSpecId[] = [];
+    const failed: OutputSpecId[] = [];
     const dir = await mkdtemp(join(tmpdir(), "render-"));
     try {
       for (const id of specs) {
@@ -39,36 +42,58 @@ export const compose = task({
         await db.from("outputs").update({ status: "rendering", error: null }).eq("id", output.id);
         try {
           const file = join(dir, `${id}.mp4`);
+          const timeline = Timeline.parse(output.timeline_json);
+          const props = {
+            timeline,
+            clipUrls,
+            imageUrls,
+            watermark: true,
+            loop: spec.loop,
+            baseWidth: spec.width,
+            baseHeight: spec.height,
+            safeArea: spec.safeArea,
+            brand,
+            scale: DRAFT_SCALE,
+          };
           await renderOutput({
             spec: id,
             outFile: file,
-            props: {
-              timeline: Timeline.parse(output.timeline_json),
-              clipUrls,
-              imageUrls,
-              watermark: true,
-              loop: spec.loop,
-              baseWidth: spec.width,
-              baseHeight: spec.height,
-              brand,
-              scale: DRAFT_SCALE,
-            },
+            props,
             onProgress: (p) => metadata.set(`progress.${id}`, Math.round(p * 100)),
           });
+          // iOS 27 stills come from the same timeline, at the hook's strongest frame.
+          for (const still of stillsFor(id)) {
+            try {
+              const png = join(dir, `still-${still.id}.png`);
+              await renderStillImage({
+                still: still.id,
+                props: { ...props, loop: false, baseWidth: still.width, baseHeight: still.height, safeArea: still.safeArea },
+                frame: Math.round(stillSecond(timeline) * spec.fps),
+                outFile: png,
+              });
+              await uploadFile(paths.draftStill(packId, still.id), png, "image/png");
+            } catch (err) {
+              logger.warn("Still failed; the video is still fine", { packId, still: still.id, error: (err as Error).message });
+            }
+          }
           await uploadFile(paths.draft(packId, id), file, "video/mp4");
           await db
             .from("outputs")
             .update({ status: "ready", draft_url: paths.draft(packId, id), updated_at: new Date().toISOString() })
             .eq("id", output.id);
           logger.info("Draft rendered", { packId, spec: id });
+          rendered.push(id);
         } catch (err) {
+          // One output failing (say the header) shouldn't stop the others; the drafts page offers a retry.
           await db.from("outputs").update({ status: "failed", error: (err as Error).message }).eq("id", output.id);
-          throw err;
+          logger.error("Draft failed", { packId, spec: id, error: (err as Error).message });
+          failed.push(id);
         }
       }
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-    return { rendered: specs.length };
+    if (rendered.length === 0) throw new Error(`No drafts rendered (${failed.join(", ")} failed).`);
+    return { rendered, failed };
   },
 });

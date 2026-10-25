@@ -5,6 +5,7 @@ import type { Brief } from "@/lib/schemas/brief";
 import type { ClipNotes } from "@/lib/schemas/clips";
 import type { ChosenHooks, Hook } from "@/lib/schemas/hooks";
 import type { OutputSpecId } from "@/lib/specs/outputs";
+import type { StillId } from "@/lib/specs/stills";
 import type { Timeline } from "@/lib/timeline/schema";
 import type { OutputStatus, PackStage, RuleResultValue, SourceStatus } from "@/types/db";
 
@@ -32,7 +33,11 @@ export interface PackState {
     draft_url: string | null;
     timeline: Timeline | null;
     rules: Array<{ rule: string; result: RuleResultValue; detail: string | null }>;
+    /** iOS 27 stills taken from this output (header and search only). */
+    stills: Array<{ id: StillId; label: string; size: string; fileName: string; url: string }>;
   }>;
+  /** App Store screenshot ids -> URLs, for screenshot segments in the player. */
+  images: Record<string, string>;
 }
 
 /** Load a pack and keep polling every 2 s while `busy(pack)` is true. */

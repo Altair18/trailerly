@@ -5,7 +5,10 @@ import { ownedPack } from "@/lib/owned";
 import { Brief } from "@/lib/schemas/brief";
 import { Clips } from "@/lib/schemas/clips";
 import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
-import { signedUrls } from "@/lib/storage";
+import { appScreenshots } from "@/lib/media/screenshots";
+import { Listing } from "@/lib/schemas/listing";
+import { stillsFor } from "@/lib/specs/stills";
+import { paths, signedUrls } from "@/lib/storage";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type Params = { params: Promise<{ packId: string }> };
@@ -34,10 +37,16 @@ export async function GET(_req: Request, { params }: Params) {
     : { data: [] };
 
   const clips = source?.clips_json ? Clips.parse(source.clips_json) : [];
+  const stillPaths = (o: { spec: string; status: string }) =>
+    o.status === "ready" ? stillsFor(o.spec as never).map((s) => ({ still: s, path: paths.draftStill(pack.id, s.id) })) : [];
   const urls = await signedUrls([
     ...clips.flatMap((c) => [c.path, c.poster_path]),
     ...(outputs ?? []).flatMap((o) => (o.draft_url ? [o.draft_url] : [])),
+    ...(outputs ?? []).flatMap((o) => stillPaths(o).map((s) => s.path)),
   ]);
+  const { data: app } = await db.from("apps").select("listing_json").eq("id", pack.app_id).single();
+  const listing = Listing.safeParse(app?.listing_json);
+  const images = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
 
   return NextResponse.json({
     ...pack,
@@ -57,7 +66,11 @@ export async function GET(_req: Request, { params }: Params) {
       draft_url: o.draft_url ? urls[o.draft_url] ?? null : null,
       timeline: o.timeline_json,
       rules: (rules ?? []).filter((r) => r.output_id === o.id).map(({ output_id: _, ...r }) => r),
+      stills: stillPaths(o).flatMap(({ still, path }) =>
+        urls[path] ? [{ id: still.id, label: still.label, size: `${still.width}×${still.height}`, fileName: still.fileName, url: urls[path] }] : [],
+      ),
     })),
+    images,
   });
 }
 

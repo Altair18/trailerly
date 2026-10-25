@@ -5,7 +5,7 @@ import { isPrivate } from "@/lib/schemas/clips";
 import { MAX_OVERLAY_WORDS } from "./enforce";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { enforceSpec } from "./enforce";
-import { fallbackPreview } from "./preview";
+import { fallbackTimeline } from "./preview";
 import type { Timeline } from "./schema";
 
 export const MAX_REPLANS = 2;
@@ -41,6 +41,11 @@ Never use a clip marked personal_info unless there is no other way to reach the 
 Screenshots: still App Store screenshots, animated for you. Use them (2 to 4 s each, with a caption) only when the
 clips are missing, too short to reach the minimum length, or private. Real clips always come first.
 
+Header and search (landscape App Store videos, new in iOS 27): the phone recording is shown on a stage beside your
+text, so keep them short and simple: aim for target_seconds, one hook line held over the first 3 to 5 s, then 1 or 2
+caption beats, and the brand overlay last. The header loops, so end on a calm moment that cuts cleanly back to the
+start. The search video is always muted and shown small in results, so the first 2 seconds must be the best moment.
+
 Rules: the non-overlay segments play back to back from 0 with no gaps or overlaps. A screen segment must not run past
 the end of its clip (clip_offset + duration <= clip length). Only use segment types the spec allows.
 Return JSON: {"segments": [...]}.`;
@@ -50,6 +55,8 @@ export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: stri
     output: {
       name: spec.label,
       seconds: [spec.minSeconds, spec.maxSeconds],
+      target_seconds: spec.targetSeconds,
+      loops: spec.loop || undefined,
       allowed_segments: spec.allowedSegments,
       max_ai_seconds: spec.maxAiSeconds,
       min_real_screen_share: spec.minScreenShare,
@@ -88,7 +95,7 @@ export function safeClips<T extends Pick<Clip, "id" | "duration" | "notes">>(
 
 /**
  * Ask the model for a timeline, check it in code, and re-ask with the errors up to MAX_REPLANS times.
- * The App Store preview falls back to a code-built timeline so it never blocks the pack.
+ * App Store outputs fall back to a code-built timeline so they never block the pack.
  */
 export async function planTimeline(
   spec: OutputSpec,
@@ -109,8 +116,9 @@ export async function planTimeline(
       feedback = `Your reply could not be read: ${(err as Error).message}`;
     }
   }
-  if (spec.id === "preview") {
-    return { timeline: fallbackPreview(ctx.clips, ctx.headline, spec, ctx.screenshots), source: "fallback", attempts: MAX_REPLANS + 1 };
+  // App Store outputs fall back to a code-built cut so the pack never blocks on the model.
+  if (spec.placement === "appstore") {
+    return { timeline: fallbackTimeline(ctx.clips, ctx.headline, spec, ctx.screenshots), source: "fallback", attempts: MAX_REPLANS + 1 };
   }
   throw new Error(`Couldn't plan a valid ${spec.label} timeline: ${feedback}`);
 }
