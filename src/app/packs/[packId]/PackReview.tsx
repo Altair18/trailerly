@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Close, Down, Up } from "@/components/Icons";
+import { type PackStep, TopBar } from "@/components/TopBar";
+import { accent, tile } from "@/lib/palette";
 import type { Brief } from "@/lib/schemas/brief";
 import { type ChosenHooks, type Hook, MAX_SOCIAL_HOOKS } from "@/lib/schemas/hooks";
 import type { PackStage } from "@/types/db";
@@ -14,25 +17,16 @@ interface PackState {
   app: { name: string; icon_url: string | null } | null;
 }
 
-const STAGE_LABEL: Record<PackStage, string> = {
-  ingesting: "Reading your App Store listing and reviews…",
-  writing_brief: "Working out what your app does…",
-  writing_hooks: "Writing hooks and checking them against the rules…",
-  review: "",
-  error: "Something went wrong.",
-};
-
-const FORMAT_LABEL: Record<Hook["format"], string> = {
-  pov: "POV",
-  problem: "Problem",
-  before_after: "Before/after",
-  list: "List",
-  question: "Question",
-};
+const PIPELINE: Array<{ stage: PackStage; label: string }> = [
+  { stage: "ingesting", label: "Listing and reviews" },
+  { stage: "writing_brief", label: "Writing the brief" },
+  { stage: "writing_hooks", label: "Writing and checking hooks" },
+];
 
 export function PackReview({ packId }: { packId: string }) {
   const [pack, setPack] = useState<PackState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [view, setView] = useState<"brief" | "hooks">("brief");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/packs/${packId}`);
@@ -51,33 +45,77 @@ export function PackReview({ packId }: { packId: string }) {
     return () => clearTimeout(t);
   }, [pack, load]);
 
-  if (loadError) return <p role="alert">{loadError}</p>;
-  if (!pack) return <p className="muted">Loading…</p>;
+  const ready = pack?.stage === "review" && pack.brief_json && pack.hooks_json;
+  const step: PackStep = ready && view === "hooks" ? "Hooks" : "Brief";
 
   return (
     <>
-      <header style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        {pack.app?.icon_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={pack.app.icon_url} alt="" width={56} height={56} style={{ borderRadius: 12 }} />
+      <TopBar step={step} />
+      <main className="wrap" style={{ paddingTop: 32, paddingBottom: 120 }}>
+        {loadError && <p role="alert">{loadError}</p>}
+        {!loadError && !pack && <p className="mu">Loading…</p>}
+        {pack && (
+          <>
+            {!ready && <Progress pack={pack} />}
+            {ready && view === "brief" && (
+              <BriefEditor packId={packId} app={pack.app} initial={pack.brief_json!} onDone={() => setView("hooks")} />
+            )}
+            {ready && view === "hooks" && (
+              <HookPicker
+                packId={packId}
+                app={pack.app}
+                hooks={pack.hooks_json!}
+                initial={pack.chosen_hooks}
+                onBack={() => setView("brief")}
+              />
+            )}
+          </>
         )}
-        <h1 style={{ margin: 0 }}>{pack.app?.name ?? "Your pack"}</h1>
-      </header>
-
-      {pack.stage === "error" && (
-        <p role="alert">
-          {STAGE_LABEL.error} {pack.stage_error}
-        </p>
-      )}
-      {pack.stage !== "review" && pack.stage !== "error" && <p className="muted">{STAGE_LABEL[pack.stage]}</p>}
-
-      {pack.stage === "review" && pack.brief_json && (
-        <BriefEditor packId={packId} initial={pack.brief_json} />
-      )}
-      {pack.stage === "review" && pack.hooks_json && (
-        <HookPicker packId={packId} hooks={pack.hooks_json} initial={pack.chosen_hooks} />
-      )}
+      </main>
     </>
+  );
+}
+
+function AppLine({ app, step }: { app: PackState["app"]; step: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      {app?.icon_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={app.icon_url} alt="" width={28} height={28} style={{ borderRadius: 8 }} />
+      ) : (
+        <span style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(150deg,#B8F23A,#2EE6A6)" }} />
+      )}
+      <span style={{ fontWeight: 600 }}>{app?.name ?? "Your app"}</span>
+      <span className="mu">· step {step} of 8</span>
+    </div>
+  );
+}
+
+function Progress({ pack }: { pack: PackState }) {
+  const current = PIPELINE.findIndex((p) => p.stage === pack.stage);
+  return (
+    <div className="rise">
+      <AppLine app={pack.app} step={3} />
+      <h1 className="disp h1" style={{ marginBottom: 24 }}>
+        {pack.stage === "error" ? "That didn't work" : "Reading your app"}
+      </h1>
+      {pack.stage === "error" ? (
+        <div className="card" style={{ borderColor: "var(--coral)" }}>
+          <span className="lab" style={{ color: "var(--coral)" }}><span className="dot" />Error</span>
+          <p style={{ margin: 0 }}>{pack.stage_error ?? "Something went wrong."}</p>
+          <a className="btn btn-light" href="/packs/new" style={{ justifySelf: "start" }}>Try another link</a>
+        </div>
+      ) : (
+        <div className="reading" role="status" aria-live="polite">
+          {PIPELINE.map((p, i) => (
+            <span key={p.stage} className={i < current ? "done" : i === current ? "now" : undefined}>
+              {i < current ? "✓" : i === current ? <span className="spinner" aria-hidden="true" /> : null}
+              {p.label}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -88,115 +126,299 @@ async function patch(packId: string, body: unknown): Promise<string | null> {
     body: JSON.stringify(body),
   });
   if (res.ok) return null;
-  return ((await res.json()) as { error?: string }).error ?? "Couldn't save.";
+  return ((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't save.";
 }
 
-function BriefEditor({ packId, initial }: { packId: string; initial: Brief }) {
-  const [brief, setBrief] = useState(initial);
-  const [status, setStatus] = useState<string | null>(null);
+const TONES = ["Warm", "Calm", "Funny", "Bold", "Expert", "Playful"];
+const MAX_TONES = 3;
+const wordCount = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
+const splitTone = (tone: string) =>
+  tone.split(/,|\band\b/i).map((t) => t.trim()).filter(Boolean).map((t) => t[0]!.toUpperCase() + t.slice(1).toLowerCase());
 
-  const lines = (v: string) => v.split("\n").map((s) => s.trim()).filter(Boolean);
+function BriefEditor({ packId, app, initial, onDone }: { packId: string; app: PackState["app"]; initial: Brief; onDone: () => void }) {
+  const [brief, setBrief] = useState(initial);
+  const [tones, setTones] = useState<string[]>(() => splitTone(initial.tone).slice(0, MAX_TONES));
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toneOptions = [...new Set([...TONES, ...tones])];
+  const features = brief.features;
+  const setFeatures = (f: string[]) => setBrief({ ...brief, features: f });
+  const move = (i: number, d: number) => {
+    const f = features.slice();
+    [f[i], f[i + d]] = [f[i + d]!, f[i]!];
+    setFeatures(f);
+  };
+  const draftWords = wordCount(draft);
+
+  function addPhrase(e: React.FormEvent) {
+    e.preventDefault();
+    if (draftWords === 0 || draftWords > 8 || brief.review_phrases.length >= 10) return;
+    setBrief({ ...brief, review_phrases: [...brief.review_phrases, draft.trim()] });
+    setDraft("");
+  }
 
   async function save() {
-    setStatus("Saving…");
-    setStatus((await patch(packId, { brief })) ?? "Saved.");
+    setSaving(true);
+    setError(null);
+    const cleaned: Brief = { ...brief, features: features.map((f) => f.trim()).filter(Boolean), tone: tones.join(", ") };
+    const problem = await patch(packId, { brief: cleaned });
+    setSaving(false);
+    if (problem) setError(problem);
+    else onDone();
   }
 
   return (
-    <section>
-      <h2>Brief</h2>
-      <p className="muted">This is what Trailerly understood. Fix anything that's wrong.</p>
-      <div style={{ display: "grid", gap: 12 }}>
-        <label>
-          What it does
-          <textarea rows={2} value={brief.what_it_does} onChange={(e) => setBrief({ ...brief, what_it_does: e.target.value })} />
-        </label>
-        <label>
-          Who it's for
-          <textarea rows={2} value={brief.audience} onChange={(e) => setBrief({ ...brief, audience: e.target.value })} />
-        </label>
-        <label>
-          Key features (3 to 5, one per line)
-          <textarea rows={5} value={brief.features.join("\n")} onChange={(e) => setBrief({ ...brief, features: lines(e.target.value) })} />
-        </label>
-        <label>
-          Review phrases (one per line, 8 words or fewer)
-          <textarea rows={5} value={brief.review_phrases.join("\n")} onChange={(e) => setBrief({ ...brief, review_phrases: lines(e.target.value) })} />
-        </label>
-        <label>
-          Tone
-          <input value={brief.tone} onChange={(e) => setBrief({ ...brief, tone: e.target.value })} />
-        </label>
+    <>
+      <div className="rise" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
         <div>
-          <button onClick={save}>Save brief</button> <span className="muted">{status}</span>
+          <AppLine app={app} step={3} />
+          <h1 className="disp h1">Check the brief</h1>
         </div>
+        <p className="mu" style={{ margin: 0, maxWidth: 440, fontSize: 16 }}>
+          Written from your listing and reviews. Change anything that&apos;s wrong. Hooks and voiceovers are written from this.
+        </p>
       </div>
-    </section>
+
+      <div className="brief-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
+        <section className="card rise" style={{ gridColumn: "span 2", animationDelay: ".05s" }}>
+          <label htmlFor="what" className="lab" style={{ color: "var(--lime)" }}><span className="dot" />What it does</label>
+          <textarea
+            id="what"
+            className="field"
+            rows={2}
+            style={{ font: "900 38px/1 var(--display)", fontStretch: "72%", background: "transparent", border: 0, padding: 0, boxShadow: "none" }}
+            value={brief.what_it_does}
+            onChange={(e) => setBrief({ ...brief, what_it_does: e.target.value })}
+          />
+        </section>
+
+        <section className="card rise" style={{ animationDelay: ".12s" }}>
+          <label htmlFor="who" className="lab" style={{ color: "var(--cyan)" }}><span className="dot" />Who it&apos;s for</label>
+          <textarea
+            id="who"
+            className="field"
+            rows={3}
+            style={{ fontSize: 18, fontWeight: 600 }}
+            value={brief.audience}
+            onChange={(e) => setBrief({ ...brief, audience: e.target.value })}
+          />
+        </section>
+
+        <section className="card rise" style={{ animationDelay: ".18s" }}>
+          <span className="lab" style={{ color: "var(--yel)" }} id="tone-label"><span className="dot" />Tone</span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="group" aria-labelledby="tone-label">
+            {toneOptions.map((t) => {
+              const on = tones.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  className="pill"
+                  aria-pressed={on}
+                  onClick={() => setTones(on ? tones.filter((x) => x !== t) : tones.length < MAX_TONES ? [...tones, t] : tones)}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mu" style={{ margin: 0, fontSize: 14 }}>Pick up to {MAX_TONES}. Voiceovers and captions follow this.</p>
+        </section>
+
+        <section className="card rise" style={{ gridColumn: "span 2", animationDelay: ".24s" }}>
+          <span className="lab" style={{ color: "var(--orange)" }}>
+            <span className="dot" />Key features<span className="aside">{features.length} of 5 · order sets what shows first</span>
+          </span>
+          <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+            {features.map((f, i) => (
+              <li key={i} className="feat">
+                <span className="k" style={{ background: accent(i) }}>{i + 1}</span>
+                <input
+                  aria-label={`Feature ${i + 1}`}
+                  value={f}
+                  onChange={(e) => setFeatures(features.map((x, k) => (k === i ? e.target.value : x)))}
+                />
+                <button className="ib" type="button" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}><Up /></button>
+                <button className="ib" type="button" aria-label="Move down" disabled={i === features.length - 1} onClick={() => move(i, 1)}><Down /></button>
+                <button className="ib" type="button" aria-label="Remove feature" disabled={features.length <= 3} onClick={() => setFeatures(features.filter((_, k) => k !== i))}><Close /></button>
+              </li>
+            ))}
+          </ol>
+          {features.length < 5 && (
+            <button className="btn btn-ghost" type="button" onClick={() => setFeatures([...features, ""])} style={{ justifySelf: "start", minHeight: 40, fontSize: 14 }}>
+              + Add a feature
+            </button>
+          )}
+        </section>
+
+        <section className="card rise" style={{ gridColumn: "span 2", animationDelay: ".3s" }}>
+          <span className="lab" style={{ color: "var(--pink)" }}>
+            <span className="dot" />Review phrases<span className="aside">{brief.review_phrases.length} of 10 · 8 words or fewer</span>
+          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {brief.review_phrases.map((p, i) => (
+              <span key={p} className="chip pop" style={{ background: accent(i + 5) }}>
+                {p}
+                <button
+                  type="button"
+                  aria-label={`Remove ${p}`}
+                  onClick={() => setBrief({ ...brief, review_phrases: brief.review_phrases.filter((_, k) => k !== i) })}
+                >
+                  <Close size={12} />
+                </button>
+              </span>
+            ))}
+            {brief.review_phrases.length === 0 && <span className="mu">No phrase came up in two or more reviews. Add your own.</span>}
+            {brief.review_phrases.length < 10 && (
+              <form onSubmit={addPhrase} style={{ display: "flex", flex: "1 1 260px" }}>
+                <label htmlFor="np" className="sr">Add a phrase</label>
+                <input id="np" className="add" placeholder="Add a phrase and press Enter" value={draft} onChange={(e) => setDraft(e.target.value)} />
+              </form>
+            )}
+          </div>
+          {draftWords > 8 && (
+            <p style={{ margin: 0, fontSize: 14, color: "var(--yel)" }}>That&apos;s {draftWords} words. Keep it to 8 or fewer so it fits on screen.</p>
+          )}
+          <p className="mu" style={{ margin: 0, fontSize: 14 }}>Real words from reviews make the best hooks. Reviewer names are never used.</p>
+        </section>
+      </div>
+
+      <div className="actionbar">
+        <span style={{ flex: "1 1 260px" }}>
+          <b>Looks right?</b> <span className="mu">Your hooks are ready on the next step.</span>
+          {error && <span role="alert" style={{ display: "block", color: "var(--coral)" }}>{error}</span>}
+        </span>
+        <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save and pick hooks"}
+        </button>
+      </div>
+    </>
   );
 }
 
-function HookPicker({ packId, hooks, initial }: { packId: string; hooks: Hook[]; initial: ChosenHooks | null }) {
+const FORMAT_LABEL: Record<Hook["format"], string> = {
+  pov: "POV",
+  problem: "Problem",
+  before_after: "Before/after",
+  list: "List",
+  question: "Question",
+};
+const FILTERS = ["all", "pov", "problem", "before_after", "list", "question"] as const;
+
+function HookPicker({
+  packId,
+  app,
+  hooks,
+  initial,
+  onBack,
+}: {
+  packId: string;
+  app: PackState["app"];
+  hooks: Hook[];
+  initial: ChosenHooks | null;
+  onBack: () => void;
+}) {
+  const [mode, setMode] = useState<"ads" | "head">("ads");
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [social, setSocial] = useState<string[]>(initial?.social ?? []);
   const [headline, setHeadline] = useState<string | null>(initial?.headline ?? null);
   const [status, setStatus] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   function toggle(text: string) {
+    if (mode === "head") return setHeadline(headline === text ? null : text);
     setSocial((cur) =>
       cur.includes(text) ? cur.filter((t) => t !== text) : cur.length < MAX_SOCIAL_HOOKS ? [...cur, text] : cur,
     );
   }
 
   async function save() {
-    setStatus("Saving…");
-    setStatus((await patch(packId, { chosen: { social, headline } })) ?? "Saved.");
+    setSaving(true);
+    const problem = await patch(packId, { chosen: { social, headline } });
+    setSaving(false);
+    setStatus(problem ?? "Saved. Drafts come in the next phase.");
   }
 
+  const anySelected = mode === "ads" ? social.length > 0 : headline !== null;
+
   return (
-    <section>
-      <h2>Hooks</h2>
-      <p className="muted">
-        Pick up to {MAX_SOCIAL_HOOKS} for the social ads ({social.length} picked) and one headline for the App Store videos.
-        Every hook here has passed the rules check.
-      </p>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th align="left">Hook</th>
-            <th>Social ad</th>
-            <th>Headline</th>
-          </tr>
-        </thead>
-        <tbody>
-          {hooks.map((h) => (
-            <tr key={h.text} style={{ borderTop: "1px solid var(--border)" }}>
-              <td style={{ padding: "8px 0" }}>
-                {h.text} <span className="muted">· {FORMAT_LABEL[h.format]}</span>
-              </td>
-              <td align="center">
-                <input
-                  type="checkbox"
-                  aria-label={`Use "${h.text}" in a social ad`}
-                  checked={social.includes(h.text)}
-                  disabled={!social.includes(h.text) && social.length >= MAX_SOCIAL_HOOKS}
-                  onChange={() => toggle(h.text)}
-                />
-              </td>
-              <td align="center">
-                <input
-                  type="radio"
-                  name="headline"
-                  aria-label={`Use "${h.text}" as the headline`}
-                  checked={headline === h.text}
-                  onChange={() => setHeadline(h.text)}
-                />
-              </td>
-            </tr>
+    <>
+      <div className="rise" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
+        <div>
+          <AppLine app={app} step={4} />
+          <h1 className="disp h1">Pick your hooks</h1>
+        </div>
+        <p className="mu" style={{ margin: 0, maxWidth: 440, fontSize: 16 }}>
+          {hooks.length} openers written from your brief and reviews, all passing the rules. Pick up to {MAX_SOCIAL_HOOKS} for social ads, and one headline for the App Store videos.
+        </p>
+      </div>
+
+      <div className="rise" style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 18, animationDelay: ".08s" }}>
+        <div className="seg" role="group" aria-label="What you're picking">
+          <button type="button" aria-pressed={mode === "ads"} onClick={() => setMode("ads")}>
+            Social ads <span className="ct">{social.length} of {MAX_SOCIAL_HOOKS}</span>
+          </button>
+          <button type="button" aria-pressed={mode === "head"} onClick={() => setMode("head")}>
+            App Store headline <span className="ct">{headline ? 1 : 0} of 1</span>
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }} role="group" aria-label="Filter by format">
+          {FILTERS.map((f) => (
+            <button key={f} type="button" className="fil" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+              {f === "all" ? "All" : FORMAT_LABEL[f]}
+            </button>
           ))}
-        </tbody>
-      </table>
-      <p>
-        <button onClick={save}>Save picks</button> <span className="muted">{status}</span>
+        </div>
+      </div>
+
+      <p className="mu rise" style={{ margin: "0 0 18px", fontSize: 14, animationDelay: ".1s" }}>
+        {mode === "ads"
+          ? "Tap hooks to add them to your social ads. Each picked hook becomes one ad, in the order you pick them."
+          : "Tap one hook to use as the headline across the App Store preview, header and search videos."}
       </p>
-    </section>
+
+      <div className="hook-grid">
+        {hooks.map((h, i) => {
+          if (filter !== "all" && h.format !== filter) return null;
+          const adN = social.indexOf(h.text) + 1;
+          const isHead = headline === h.text;
+          const on = mode === "ads" ? adN > 0 : isHead;
+          const cls = on ? (mode === "ads" ? "sel" : "head") : anySelected ? "dim" : "";
+          return (
+            <button
+              key={h.text}
+              type="button"
+              className={`hook rise ${cls}`}
+              aria-pressed={on}
+              onClick={() => toggle(h.text)}
+              style={{ animationDelay: `${(0.12 + i * 0.05).toFixed(2)}s` }}
+            >
+              <span className="bgx flow" style={{ backgroundImage: tile(i) }} />
+              <span className="txt disp">{h.text}</span>
+              <span className="tag">{FORMAT_LABEL[h.format]}</span>
+              {adN > 0 && <span className="badge pop" style={{ background: "#fff", bottom: 16 }}>▶ Ad {adN}</span>}
+              {isHead && <span className="badge pop" style={{ background: "var(--yel)", bottom: adN > 0 ? 58 : 16 }}>★ Headline</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="actionbar">
+        <span style={{ flex: "1 1 260px" }} role="status">
+          <b>
+            {social.length} {social.length === 1 ? "ad" : "ads"}, {headline ? "1 headline" : "no headline yet"}.
+          </b>{" "}
+          <span className="mu">
+            {status ?? (social.length > 0 && headline ? "Ready to save." : "Pick at least one ad and a headline.")}
+          </span>
+        </span>
+        <button className="btn btn-ghost" type="button" onClick={onBack}>Back to brief</button>
+        <button className="btn btn-primary" type="button" onClick={save} disabled={saving || social.length === 0 || !headline}>
+          {saving ? "Saving…" : "Save picks"}
+        </button>
+      </div>
+    </>
   );
 }
