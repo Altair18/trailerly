@@ -171,7 +171,10 @@ function Detail({
   return (
     <section className="card rise" style={{ marginTop: 36, gridTemplateColumns: "minmax(0, 300px) minmax(0, 1fr)", gap: 28, alignItems: "start" }}>
       <div className="player-box" style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
-        {timeline ? (
+        {output.status === "ready" && output.draft_url ? (
+          // The rendered file is what ships: play it once it exists. The live preview is only for while it renders.
+          <video src={output.draft_url} controls autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+        ) : timeline ? (
           <Player
             component={TimelineVideo}
             inputProps={
