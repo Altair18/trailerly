@@ -1,5 +1,6 @@
 import type { Brief } from "@/lib/schemas/brief";
 import type { Clip } from "@/lib/schemas/clips";
+import { MAX_OVERLAY_WORDS } from "./enforce";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { enforceSpec } from "./enforce";
 import { fallbackPreview } from "./preview";
@@ -11,18 +12,30 @@ export interface PlanContext {
   brief: Brief;
   headline: string | null;
   socialHook?: string | null;
-  clips: Pick<Clip, "id" | "duration">[];
+  clips: Pick<Clip, "id" | "duration" | "notes">[];
 }
 
 export type Generate = (prompt: string) => Promise<Timeline>;
 
-export const PLANNER_SYSTEM = `You plan short app videos as a timeline of segments.
+export const PLANNER_SYSTEM = `You edit short app videos. You plan them as a timeline of segments.
 Each segment: {"type": "screen" | "ai_scene" | "text" | "end_card", "start": seconds, "duration": seconds,
 "clip_id": for screen, "clip_offset": seconds into the clip (default 0), "prompt": for ai_scene, "text": for text and end_card,
-"overlay": true for text drawn over the segment underneath}.
+"overlay": true for text drawn over the segment underneath, "style": "hook" | "caption" | "brand" for overlays}.
+
+Story: open on the strongest moment with a "hook" overlay (the promise, 0 to 3 s), then 2 to 4 feature beats, each a
+screen segment with a "caption" overlay naming what the viewer is seeing, and finish with a "brand" overlay
+(app icon and name, no text needed) over the last 2 to 3 seconds. Where the spec allows end_card, end on one instead.
+
+On-screen text is written for video, not copied from the listing: ${MAX_OVERLAY_WORDS} words at most, plain and
+concrete ("Snap a photo, get an answer"), in the brief's tone. Each line stays up for at least 0.3 s per word
+(minimum 1.2 s), lines never overlap, and each caption starts with the screen segment it describes.
+
+Clips: each comes with a label, the feature it shows and an interest score (1 to 5). Use the highest-interest clips,
+match captions to what the clip shows, and you may use part of a clip (clip_offset + duration) to skip slow bits.
+Never use a clip marked personal_info unless there is no other way to reach the minimum length.
+
 Rules: the non-overlay segments play back to back from 0 with no gaps or overlaps. A screen segment must not run past
 the end of its clip (clip_offset + duration <= clip length). Only use segment types the spec allows.
-Use the clips in an order that shows the features in the brief, best first.
 Return JSON: {"segments": [...]}.`;
 
 export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: string): string {
@@ -38,7 +51,14 @@ export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: stri
     headline: ctx.headline,
     hook: ctx.socialHook ?? undefined,
     brief: ctx.brief,
-    clips: ctx.clips.map((c) => ({ clip_id: c.id, seconds: c.duration })),
+    clips: ctx.clips.map((c) => ({
+      clip_id: c.id,
+      seconds: c.duration,
+      shows: c.notes?.label,
+      feature: c.notes?.feature ?? undefined,
+      interest: c.notes?.interest,
+      personal_info: c.notes?.personal_info || undefined,
+    })),
     fix_these_errors_from_your_last_plan: feedback || undefined,
   });
 }

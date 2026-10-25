@@ -24,12 +24,20 @@ export async function generateJson<T>(opts: {
   prompt: string;
   schema: z.ZodType<T>;
   maxTokens?: number;
+  /** JPEG frames to show the model before the prompt. */
+  images?: { data: Buffer; label?: string }[];
 }): Promise<T> {
+  const content: Anthropic.ContentBlockParam[] = [];
+  for (const img of opts.images ?? []) {
+    if (img.label) content.push({ type: "text", text: img.label });
+    content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: img.data.toString("base64") } });
+  }
+  content.push({ type: "text", text: opts.prompt });
   const res = await anthropic().messages.create({
     model: env().ANTHROPIC_MODEL,
     max_tokens: opts.maxTokens ?? 4096,
     system: `${opts.system}\n\nReply with a single JSON object and nothing else.`,
-    messages: [{ role: "user", content: opts.prompt }],
+    messages: [{ role: "user", content }],
   });
 
   const text = res.content

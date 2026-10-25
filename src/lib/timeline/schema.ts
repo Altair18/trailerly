@@ -14,6 +14,12 @@ export const Segment = z.object({
   text: z.string().optional(),
   /** Text drawn over whatever is underneath, rather than a full-screen card. */
   overlay: z.boolean().optional(),
+  /**
+   * How an overlay looks: "hook" = big line near the top (the opening promise),
+   * "caption" = short line in the lower third naming what's on screen,
+   * "brand" = app icon and name over the last seconds (text optional).
+   */
+  style: z.enum(["hook", "caption", "brand"]).optional(),
 });
 export type Segment = z.infer<typeof Segment>;
 

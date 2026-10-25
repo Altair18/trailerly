@@ -38,6 +38,7 @@ export function RemotionRoot() {
               loop: spec.loop,
               baseWidth: spec.width,
               baseHeight: spec.height,
+              brand: { name: "Your App", iconUrl: null },
               scale: 1,
             } satisfies RenderProps
           }

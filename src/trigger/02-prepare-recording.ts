@@ -1,17 +1,21 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
-import { cutClip, normalise, poster, probe, sceneChanges } from "@/lib/media/ffmpeg";
+import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
+import { chromeCrop, cutClip, frameAt, normalise, poster, probe, sceneChanges } from "@/lib/media/ffmpeg";
+import { generateJson } from "@/lib/llm/claude";
+import { Brief } from "@/lib/schemas/brief";
 import type { Clip } from "@/lib/schemas/clips";
 import { downloadTo, paths, uploadFile } from "@/lib/storage";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { PackPayload } from "./payload";
 
 /**
- * Stage 2: ffprobe the upload, convert to 30 fps, split at scene changes
- * (ffmpeg scene filter), keep 3 to 6 clips of at least 2 seconds.
+ * Stage 2: ffprobe the upload, cut the phone's status and gesture bars, convert to 30 fps,
+ * split at scene changes (ffmpeg scene filter), keep 3 to 6 clips of at least 2 seconds,
+ * then have Claude label each clip and flag personal data from a few frames.
  */
 export const prepareRecording = task({
   id: "prepare-recording",
@@ -27,7 +31,8 @@ export const prepareRecording = task({
       const raw = join(dir, "raw");
       const norm = join(dir, "norm.mp4");
       await downloadTo(source.url, raw);
-      await normalise(raw, norm);
+      const original = await probe(raw);
+      await normalise(raw, norm, chromeCrop(original.width, original.height));
 
       const { duration } = await probe(norm);
       if (duration < MIN_RECORDING_SECONDS - 0.5 || duration > MAX_RECORDING_SECONDS + 0.5) {
@@ -36,6 +41,7 @@ export const prepareRecording = task({
 
       const ranges = planClips(duration, await sceneChanges(norm));
       const clips: Clip[] = [];
+      const frames: ClipFrames[] = [];
       for (const [i, r] of ranges.entries()) {
         const n = i + 1;
         const clipFile = join(dir, `clip-${n}.mp4`);
@@ -45,6 +51,19 @@ export const prepareRecording = task({
         await uploadFile(paths.clip(packId, n), clipFile, "video/mp4");
         await uploadFile(paths.poster(packId, n), posterFile, "image/jpeg");
         clips.push({ id: `clip_${n}`, ...r, path: paths.clip(packId, n), poster_path: paths.poster(packId, n) });
+        frames.push({ clipId: `clip_${n}`, frames: await sampleFrames(clipFile, dir, n, r.duration) });
+      }
+
+      // Best-effort: a clip without notes still works, the planner just knows less about it.
+      try {
+        const { data: pack } = await db.from("packs").select("brief_json").eq("id", packId).single();
+        const brief = Brief.safeParse(pack?.brief_json);
+        const notes = await analyseClips(frames, brief.success ? brief.data.features : [], (opts) =>
+          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048 }),
+        );
+        for (const clip of clips) if (notes[clip.id]) clip.notes = notes[clip.id];
+      } catch (err) {
+        logger.warn("Clip check failed; continuing without notes", { packId, error: (err as Error).message });
       }
 
       await db.from("sources").update({ status: "ready", duration_s: duration, clips_json: clips }).eq("id", sourceId);
@@ -58,3 +77,14 @@ export const prepareRecording = task({
     }
   },
 });
+
+/** Two frames per clip (a quarter and three quarters in) for the vision check. */
+async function sampleFrames(clipFile: string, dir: string, n: number, duration: number): Promise<Buffer[]> {
+  const out: Buffer[] = [];
+  for (const [k, at] of [duration * 0.25, duration * 0.75].entries()) {
+    const file = join(dir, `clip-${n}-f${k}.jpg`);
+    await frameAt(clipFile, file, at);
+    out.push(await readFile(file));
+  }
+  return out;
+}
