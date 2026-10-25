@@ -2,7 +2,7 @@ import { rankClips } from "@/lib/media/analyse";
 import { SCREENSHOT_SECONDS, type Screenshot } from "@/lib/media/screenshots";
 import { type Clip, isPrivate, liveRange } from "@/lib/schemas/clips";
 import type { OutputSpec } from "@/lib/specs/outputs";
-import { MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
+import { MAX_OVERLAY_WORDS, readSeconds, wordCount } from "./enforce";
 import type { Segment, Timeline } from "./schema";
 
 export const HEADLINE_SECONDS = 3;
@@ -11,9 +11,12 @@ const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Trim a headline to an on-screen line: the first few words, cut at a natural break if there is one. */
 export function shortLine(text: string, maxWords = MAX_OVERLAY_WORDS): string {
-  const first = text.split(/[.!?:;\u2014]|\s[-\u2013]\s/)[0]!.trim();
-  const words = first.split(/\s+/).filter(Boolean);
-  return words.slice(0, maxWords).join(" ").replace(/[,]$/, "");
+  // Break at the first natural stop, but keep a short lead-in such as "POV:" or "Me:" with what follows it.
+  const parts = text.split(/(?<=[.!?:;\u2014])|(?=\s[-\u2013]\s)/);
+  let line = parts[0]!;
+  if (/:\s*$/.test(line) && wordCount(line) <= 2 && parts[1]) line += parts[1];
+  const words = line.replace(/\s[-\u2013]\s*$/, "").replace(/[.!?;\u2014]+\s*$/, "").trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, maxWords).join(" ").replace(/[,:]$/, "");
 }
 
 /**
