@@ -8,5 +8,16 @@ export const Hook = z.object({
 });
 export type Hook = z.infer<typeof Hook>;
 
-export const HookSet = z.object({ hooks: z.array(Hook).length(10) });
+/** What the model returns per call; the pipeline tops up to HOOK_COUNT across calls. */
+export const HookSet = z.object({ hooks: z.array(Hook).min(1).max(10) });
 export type HookSet = z.infer<typeof HookSet>;
+
+export const HOOK_COUNT = 10;
+export const MAX_SOCIAL_HOOKS = 5;
+
+/** The user's picks: up to 5 hooks for social ads and one headline for the App Store videos. */
+export const ChosenHooks = z.object({
+  social: z.array(z.string()).max(MAX_SOCIAL_HOOKS),
+  headline: z.string().nullable(),
+});
+export type ChosenHooks = z.infer<typeof ChosenHooks>;

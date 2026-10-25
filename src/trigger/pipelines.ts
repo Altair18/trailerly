@@ -1,4 +1,5 @@
 import { task } from "@trigger.dev/sdk";
+import { setStage } from "@/lib/packs";
 import { ingestListing } from "./01-ingest-listing";
 import { writeBrief } from "./03-write-brief";
 import { writeHooks } from "./04-write-hooks";
@@ -16,11 +17,19 @@ import type { PackPayload } from "./payload";
 /** Link pasted -> listing, brief and hooks for the user to review. */
 export const preparePack = task({
   id: "prepare-pack",
-  run: async ({ packId, link }: PackPayload & { link: string }) => {
-    const { listing, reviews } = await ingestListing.triggerAndWait({ link }).unwrap();
+  retry: { maxAttempts: 1 }, // each stage retries on its own
+  run: async ({ packId }: PackPayload) => {
+    await setStage(packId, "ingesting");
+    const { listing, reviews } = await ingestListing.triggerAndWait({ packId }).unwrap();
+    await setStage(packId, "writing_brief");
     const brief = await writeBrief.triggerAndWait({ packId, listing, reviews }).unwrap();
+    await setStage(packId, "writing_hooks");
     const { hooks } = await writeHooks.triggerAndWait({ packId, brief }).unwrap();
+    await setStage(packId, "review");
     return { brief, hooks };
+  },
+  onFailure: async ({ payload, error }) => {
+    await setStage(payload.packId, "error", error instanceof Error ? error.message : String(error));
   },
 });
 
