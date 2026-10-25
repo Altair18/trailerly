@@ -13,6 +13,22 @@ export type Tier = "fast" | "smart";
 
 export const modelFor = (tier: Tier) => (tier === "smart" ? env().ANTHROPIC_MODEL : env().ANTHROPIC_FAST_MODEL);
 
+/** One model call's cost drivers, for logs and the planner comparison script. */
+export interface LlmUsage {
+  step: string;
+  tier: Tier;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+let usageListener: ((u: LlmUsage) => void) | undefined;
+
+/** Receive every call's usage (the comparison script tallies them); logs go to the console either way. */
+export function onLlmUsage(listener: ((u: LlmUsage) => void) | undefined) {
+  usageListener = listener;
+}
+
 export class SchemaError extends Error {
   constructor(message: string, readonly raw: string) {
     super(message);
@@ -37,6 +53,8 @@ export async function generateJson<T>(opts: {
   tier?: Tier;
   /** Thinking effort; lower is cheaper. Defaults: fast -> low, smart -> medium. */
   effort?: "low" | "medium" | "high";
+  /** Pipeline step name for the usage log, e.g. "plan:header". */
+  step?: string;
 }): Promise<T> {
   const content: Anthropic.ContentBlockParam[] = [];
   for (const img of opts.images ?? []) {
@@ -52,6 +70,16 @@ export async function generateJson<T>(opts: {
     system: `${opts.system}\n\nReply with a single JSON object and nothing else.`,
     messages: [{ role: "user", content }],
   });
+
+  const usage: LlmUsage = {
+    step: opts.step ?? "unnamed",
+    tier,
+    model: res.model,
+    input_tokens: res.usage.input_tokens,
+    output_tokens: res.usage.output_tokens,
+  };
+  console.info(`[llm] ${JSON.stringify(usage)}`);
+  usageListener?.(usage);
 
   if (res.stop_reason === "refusal") throw new SchemaError("The model declined this request", "");
   if (res.stop_reason === "max_tokens") throw new SchemaError("The reply was cut off before it finished", "");

@@ -10,7 +10,8 @@ import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { skipDeadStarts } from "@/lib/timeline/dead-time";
 import { enforceSpec } from "@/lib/timeline/enforce";
-import { PLANNER_SYSTEM, planTimeline } from "@/lib/timeline/plan";
+import { planTimeline } from "@/lib/timeline/plan";
+import { TEMPLATE_SYSTEM, TemplateFill } from "@/lib/timeline/templates";
 import { fallbackTimeline } from "@/lib/timeline/preview";
 import { variantHooks, withHook } from "@/lib/timeline/variants";
 import { Timeline } from "@/lib/timeline/schema";
@@ -37,7 +38,7 @@ export const planTimelines = task({
     if (screenshots.length > 0) {
       try {
         screenshots = await labelScreenshots(screenshots, brief.features, (opts) =>
-          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048 }),
+          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048, step: "label-screenshots" }),
         );
       } catch (err) {
         logger.warn("Couldn't label screenshots; planning without labels", { packId, error: (err as Error).message });
@@ -49,6 +50,8 @@ export const planTimelines = task({
     const imageIds = screenshots.map((s) => s.id);
 
     const timelines: Partial<Record<OutputSpecId, Timeline>> = {};
+    const usedTemplates: string[] = [];
+    const plannedBy = { fast: 0, smart: 0, fallback: 0 };
     for (const id of specs) {
       const spec = OUTPUT_SPECS[id];
       await db.from("outputs").upsert({ pack_id: packId, spec: id, status: "planning", error: null }, { onConflict: "pack_id,spec" });
@@ -75,9 +78,11 @@ export const planTimelines = task({
       const socialIndex = id.startsWith("social_") ? Number(id.slice(-1)) - 1 : -1;
       const planned = await planTimeline(
         spec,
-        { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips, screenshots },
-        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt, tier: "smart" }),
+        { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips, screenshots, avoidTemplates: usedTemplates },
+        (prompt, tier) => generateJson({ schema: TemplateFill, system: TEMPLATE_SYSTEM, prompt, tier, maxTokens: 2048, step: `plan:${id}` }),
       );
+      if (planned.timeline.template) usedTemplates.push(planned.timeline.template);
+      plannedBy[planned.source] += 1;
       // Never open a shot on a loading screen or a frozen stretch when the clip has better footage after it.
       const timeline = skipDeadStarts(planned.timeline, clips);
       timelines[id] = timeline;
@@ -86,9 +91,18 @@ export const planTimelines = task({
         .update({ timeline_json: timeline, status: "queued", updated_at: new Date().toISOString() })
         .eq("pack_id", packId)
         .eq("spec", id);
-      logger.info("Timeline planned", { packId, spec: id, source: planned.source, attempts: planned.attempts });
+      logger.info("Timeline planned", {
+        packId,
+        spec: id,
+        source: planned.source,
+        template: timeline.template ?? null,
+        attempts: planned.attempts,
+        errors: planned.errors,
+      });
     }
-    return { timelines };
+    // How often the fast model's plan holds up, needs the main model, or falls back to code.
+    logger.info("Planner summary", { packId, ...plannedBy });
+    return { timelines, plannedBy };
   },
 });
 
