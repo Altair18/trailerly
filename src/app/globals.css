@@ -15,3 +15,7 @@ input, button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1
 button { background: var(--accent); color: white; border: none; cursor: pointer; }
 .muted { color: var(--muted); }
 ol.steps li { margin-bottom: 4px; }
+textarea, input:not([type="checkbox"]):not([type="radio"]) { width: 100%; display: block; margin-top: 4px; background: var(--bg); color: var(--fg); }
+textarea { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); }
+section { margin-top: 40px; }
+th { font-weight: 600; font-size: 14px; }

@@ -9,7 +9,7 @@ export default function Home() {
         3 App Store videos and 5 social ads.
       </p>
       <p>
-        <Link href="/packs/new">Start a pack</Link>
+        <Link href="/packs/new">Start a pack</Link> · <Link href="/login">Sign in</Link>
       </p>
     </main>
   );

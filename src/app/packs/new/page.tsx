@@ -40,7 +40,7 @@ export default function NewPack() {
           />
         </label>
         <label>
-          Screen recording (20 to 60 s, MP4 or MOV)
+          Screen recording (20 to 60 s, MP4 or MOV) <span className="muted">· coming in the next phase</span>
           {/* TODO(M2): upload to Supabase Storage and create a `sources` row. */}
           <input type="file" accept="video/mp4,video/quicktime" disabled />
         </label>

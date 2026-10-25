@@ -50,6 +50,10 @@ The flow pauses for the user twice, so it is three Trigger.dev runs:
 
 Stage 2 (`prepare-recording`) runs when the upload lands.
 
+## Status
+
+- **M1 (text only):** magic-link sign-in → paste a link → editable brief and 10 rule-checked hooks. Pick up to 5 social hooks and 1 headline.
+
 ## Getting started
 
 ```bash
@@ -60,6 +64,11 @@ npm run trigger:dev          # background jobs (needs TRIGGER_SECRET_KEY)
 npm run remotion:studio      # preview compositions
 npm test && npm run typecheck
 ```
+
+For M1 you need: a Supabase project (URL, anon key, service role key), `ANTHROPIC_API_KEY`,
+and a Trigger.dev project (`TRIGGER_PROJECT_REF`, `TRIGGER_SECRET_KEY`). In Supabase Auth, add
+`http://localhost:3000/auth/callback` to the redirect URLs. Run `npm run trigger:dev` alongside
+`npm run dev`, and add the same env vars to the Trigger.dev project for deployed runs.
 
 Database: create a Supabase project, then `supabase link` and `supabase db push`
 to apply `supabase/migrations/0001_init.sql`. Replace `src/types/db.ts` with

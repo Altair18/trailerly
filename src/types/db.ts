@@ -6,6 +6,7 @@ import type { OutputSpecId } from "@/lib/specs/outputs";
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type PackStatus = "draft" | "paid" | "rendering" | "ready" | "failed";
+export type PackStage = "ingesting" | "writing_brief" | "writing_hooks" | "review" | "error";
 export type SourceKind = "recording" | "screenshot";
 export type RuleResultValue = "pass" | "warn" | "block";
 
@@ -22,7 +23,8 @@ export type AppRow = {
   name: string; icon_url: string | null; listing_json: Json; fetched_at: string;
 };
 export type PackRow = {
-  id: string; app_id: string; status: PackStatus; brief_json: Json | null; chosen_hooks: Json | null;
+  id: string; app_id: string; status: PackStatus; stage: PackStage; stage_error: string | null;
+  brief_json: Json | null; hooks_json: Json | null; chosen_hooks: Json | null;
   price_pence: number; cost_budget_pence: number; cost_spent_pence: number; created_at: string;
 };
 export type SourceRow = {
@@ -60,6 +62,7 @@ export type Database = {
     Functions: { [_ in never]: never };
     Enums: {
       pack_status: PackStatus;
+      pack_stage: PackStage;
       source_kind: SourceKind;
       output_spec: OutputSpecId;
       rule_result: RuleResultValue;
