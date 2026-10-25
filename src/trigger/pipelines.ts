@@ -1,9 +1,10 @@
-import { task } from "@trigger.dev/sdk";
+import { logger, task } from "@trigger.dev/sdk";
 import { loadPackWithApp, setStage } from "@/lib/packs";
 import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
 import { variantHooks } from "@/lib/timeline/variants";
 import { ingestListing } from "./01-ingest-listing";
 import { writeBrief } from "./03-write-brief";
+import { writeShotListTask } from "./03b-write-shot-list";
 import { writeHooks } from "./04-write-hooks";
 import { planTimelines } from "./05-plan-timelines";
 import { compose } from "./08-compose";
@@ -24,6 +25,9 @@ export const preparePack = task({
     const { listing, reviews } = await ingestListing.triggerAndWait({ packId }).unwrap();
     await setStage(packId, "writing_brief");
     const brief = await writeBrief.triggerAndWait({ packId, listing, reviews }).unwrap();
+    // The shot list is a guide, not a gate: if it fails the user can still record and upload.
+    const shots = await writeShotListTask.triggerAndWait({ packId, brief, appName: listing.name });
+    if (!shots.ok) logger.warn("No shot list", { packId });
     await setStage(packId, "writing_hooks");
     const { hooks } = await writeHooks.triggerAndWait({ packId, brief }).unwrap();
     await setStage(packId, "review");

@@ -75,7 +75,7 @@ export const planTimelines = task({
       const { timeline, source, attempts } = await planTimeline(
         spec,
         { brief, headline: chosen.headline, socialHook: chosen.social[socialIndex] ?? null, clips, screenshots },
-        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt }),
+        (prompt) => generateJson({ schema: Timeline, system: PLANNER_SYSTEM, prompt, tier: "smart" }),
       );
       timelines[id] = timeline;
       await db

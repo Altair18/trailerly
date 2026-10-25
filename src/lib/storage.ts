@@ -7,8 +7,10 @@ const bucket = () => supabaseAdmin().storage.from(env().SUPABASE_STORAGE_BUCKET)
 
 export const paths = {
   recording: (packId: string, sourceId: string, ext: string) => `packs/${packId}/recordings/${sourceId}.${ext}`,
-  clip: (packId: string, n: number) => `packs/${packId}/clips/clip-${n}.mp4`,
-  poster: (packId: string, n: number) => `packs/${packId}/clips/clip-${n}.jpg`,
+  // Each processing run writes under its own version folder, so a re-run (or a blurred copy) never reuses a file
+  // name that storage or a CDN may still serve from cache.
+  clip: (packId: string, version: string, n: number, suffix = "") => `packs/${packId}/clips/${version}/clip-${n}${suffix}.mp4`,
+  poster: (packId: string, version: string, n: number, suffix = "") => `packs/${packId}/clips/${version}/clip-${n}${suffix}.jpg`,
   draft: (packId: string, spec: string) => `packs/${packId}/drafts/${spec}.mp4`,
   draftStill: (packId: string, still: string) => `packs/${packId}/drafts/still-${still}.png`,
 };

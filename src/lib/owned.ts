@@ -5,7 +5,7 @@ export async function ownedPack(packId: string) {
   const supabase = await supabaseServer();
   const { data } = await supabase
     .from("packs")
-    .select("id, status, stage, stage_error, brief_json, hooks_json, chosen_hooks, app_id")
+    .select("id, status, stage, stage_error, brief_json, hooks_json, chosen_hooks, shot_list_json, app_id")
     .eq("id", packId)
     .maybeSingle();
   if (!data) return null;

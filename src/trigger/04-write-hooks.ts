@@ -19,6 +19,7 @@ export const writeHooks = task({
     const hooks = await collectHooks(async ({ count, rejected, kept }) => {
       const { hooks } = await generateJson({
         schema: HookSet,
+        tier: "smart",
         system: SYSTEM,
         prompt: JSON.stringify({
           brief,

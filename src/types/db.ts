@@ -26,7 +26,7 @@ export type AppRow = {
 };
 export type PackRow = {
   id: string; app_id: string; status: PackStatus; stage: PackStage; stage_error: string | null;
-  brief_json: Json | null; hooks_json: Json | null; chosen_hooks: Json | null;
+  brief_json: Json | null; hooks_json: Json | null; chosen_hooks: Json | null; shot_list_json: Json | null;
   price_pence: number; cost_budget_pence: number; cost_spent_pence: number; created_at: string;
 };
 export type SourceRow = {

@@ -1,6 +1,6 @@
 import { rankClips } from "@/lib/media/analyse";
 import { SCREENSHOT_SECONDS, type Screenshot } from "@/lib/media/screenshots";
-import { type Clip, isPrivate } from "@/lib/schemas/clips";
+import { type Clip, isPrivate, liveRange } from "@/lib/schemas/clips";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
 import type { Segment, Timeline } from "./schema";
@@ -23,7 +23,7 @@ export function shortLine(text: string, maxWords = MAX_OVERLAY_WORDS): string {
  * Used when the model's plan keeps failing.
  */
 export function fallbackTimeline(
-  clips: Pick<Clip, "id" | "duration" | "notes">[],
+  clips: Pick<Clip, "id" | "duration" | "notes" | "idle">[],
   headline: string | null,
   spec: OutputSpec,
   screenshots: Pick<Screenshot, "id" | "notes">[] = [],
@@ -36,13 +36,17 @@ export function fallbackTimeline(
   // Prefer clean footage + screenshots; fall back to private clips only when that's still too short.
   const pool = cleanSeconds + shotSeconds >= spec.minSeconds || ranked.length === clean.length ? clean : ranked;
   const limit = Math.min(spec.maxSeconds, spec.targetSeconds);
+  // Skip dead time when the footage left still reaches the minimum length.
+  const live = pool.map((c) => ({ id: c.id, ...liveRange(c) }));
+  const trimmed = live.reduce((n, c) => n + c.duration, 0) + shotSeconds >= spec.minSeconds;
+  const cuts = trimmed ? live : pool.map((c) => ({ id: c.id, offset: 0, duration: c.duration }));
   const segments: Segment[] = [];
   let t = 0;
-  for (const clip of pool) {
+  for (const clip of cuts) {
     if (t >= limit) break;
     const duration = round(Math.min(clip.duration, limit - t));
     if (duration < 0.5) break;
-    segments.push({ type: "screen", start: round(t), duration, clip_id: clip.id, clip_offset: 0 });
+    segments.push({ type: "screen", start: round(t), duration, clip_id: clip.id, clip_offset: clip.offset });
     t += duration;
   }
   // Top up to the minimum (or show a few if there's no footage at all) with screenshots.

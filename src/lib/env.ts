@@ -10,7 +10,10 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_STORAGE_BUCKET: z.string().default("trailerly"),
   ANTHROPIC_API_KEY: z.string().optional(),
+  /** Writing that users read: brief, hooks, timeline plans. */
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-5-5"),
+  /** Cheap, fast checks: clip and screenshot labels, shot lists (about 20x cheaper than the main model). */
+  ANTHROPIC_FAST_MODEL: z.string().default("claude-haiku-5-5"),
   GEMINI_API_KEY: z.string().optional(),
   VEO_MODEL_LITE: z.string().default("veo-3.1-lite"),
   VEO_MODEL_FAST: z.string().default("veo-3.1-fast"),
