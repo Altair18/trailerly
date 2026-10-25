@@ -6,7 +6,7 @@ import { useState } from "react";
 import { PageHead } from "@/components/AppLine";
 import { TopBar } from "@/components/TopBar";
 import { tile } from "@/lib/palette";
-import { DRAFT_SCALE, DRAFT_SPECS, OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
+import { DRAFT_SCALE, DRAFT_SPECS, OUTPUT_SPECS, VARIANT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { isOverlay, totalSeconds } from "@/lib/timeline/enforce";
 import { TimelineVideo, type TimelineVideoProps } from "@/remotion/compositions/TimelineVideo";
 import { type PackState, usePack } from "../usePack";
@@ -35,7 +35,9 @@ export function Drafts({ packId }: { packId: string }) {
 
   const outputs = pack?.outputs ?? [];
   const byId = Object.fromEntries(outputs.map((o) => [o.spec, o])) as Partial<Record<OutputSpecId, Output>>;
-  const ready = DRAFT_SPECS.filter((s) => byId[s]?.status === "ready").length;
+  const expected = [...DRAFT_SPECS, ...VARIANT_SPECS.filter((s) => byId[s])];
+  const ready = expected.filter((s) => byId[s]?.status === "ready").length;
+  const variants = VARIANT_SPECS.filter((s) => byId[s]);
   const selected = byId[open];
 
   async function retry() {
@@ -53,9 +55,9 @@ export function Drafts({ packId }: { packId: string }) {
         <PageHead app={pack?.app ?? null} step={5} title="Your drafts">
           <div style={{ display: "grid", gap: 8, minWidth: 280 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "var(--tx)" }}>
-              <span>{ready} of {DRAFT_SPECS.length} ready</span>
+              <span>{ready} of {expected.length} ready</span>
             </div>
-            <div className="bar"><span style={{ width: `${(ready / DRAFT_SPECS.length) * 100}%` }} /></div>
+            <div className="bar"><span style={{ width: `${(ready / expected.length) * 100}%` }} /></div>
             <span style={{ fontSize: 13 }}>Low-resolution and watermarked. Finals render after you pay.</span>
           </div>
         </PageHead>
@@ -111,6 +113,39 @@ export function Drafts({ packId }: { packId: string }) {
           })}
         </div>
 
+        {variants.length > 0 && (
+          <>
+            <h2 className="lab mu rise" style={{ margin: "36px 0 6px" }}>Page test set</h2>
+            <p className="mu rise" style={{ margin: "0 0 12px", fontSize: 14, maxWidth: 640 }}>
+              The same cut with a different hook. Upload A, B and C as treatments in App Store Connect&apos;s Product Page Optimization to see which message wins.
+            </p>
+            <div className="rise" style={{ display: "grid", gap: 16 }}>
+              {(["header", "search"] as const).map((base) => (
+                <div key={base} style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  {[base, ...variants.filter((v) => OUTPUT_SPECS[v].variantOf === base)].map((id) => {
+                    const o = byId[id];
+                    const spec = OUTPUT_SPECS[id];
+                    const hook = o?.timeline?.segments.find((s) => s.overlay && s.style !== "caption" && s.style !== "brand")?.text;
+                    return (
+                      <div key={id} style={{ width: base === "header" ? 300 : 210, flex: "none" }}>
+                        <button className={`out${open === id ? " on" : ""}`} type="button" onClick={() => setOpen(id)} aria-label={`Open ${spec.label}`} style={{ aspectRatio: `${spec.width} / ${spec.height}` }}>
+                          {o?.status === "ready" && o.draft_url ? <video src={o.draft_url} autoPlay muted loop playsInline /> : <span className="kb flow" style={{ backgroundImage: tile(2) }} />}
+                          {o && rendering(o) && (
+                            <span className="ov"><span className="pill-tag" style={{ background: "var(--yel)", color: "var(--ink)" }}><span className="spinner" aria-hidden="true" />{STATUS_LABEL[o.status]}</span></span>
+                          )}
+                        </button>
+                        <div className="lbl">
+                          <span style={{ fontWeight: 700, fontSize: 13 }}>{spec.variant ?? "A"} · {hook ?? "…"}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         <h2 className="lab mu rise" style={{ margin: "36px 0 12px" }}>Social ads</h2>
         <div className="rise" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 18, overflowX: "auto" }}>
           {(["social_1", "social_2", "social_3", "social_4", "social_5"] as const).map((id, i) => (
@@ -137,7 +172,7 @@ export function Drafts({ packId }: { packId: string }) {
 
         <div className="actionbar">
           <span style={{ flex: "1 1 260px" }}>
-            <b>{ready === DRAFT_SPECS.length ? "Drafts ready." : "Rendering your drafts…"}</b>{" "}
+            <b>{ready === expected.length ? "Drafts ready." : "Rendering your drafts…"}</b>{" "}
             <span className="mu">Rules, payment and download arrive in the next phases.</span>
           </span>
           <Link className="btn btn-ghost" href={`/packs/${packId}`}>Back to hooks</Link>

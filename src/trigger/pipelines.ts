@@ -1,5 +1,7 @@
 import { task } from "@trigger.dev/sdk";
-import { setStage } from "@/lib/packs";
+import { loadPackWithApp, setStage } from "@/lib/packs";
+import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
+import { variantHooks } from "@/lib/timeline/variants";
 import { ingestListing } from "./01-ingest-listing";
 import { writeBrief } from "./03-write-brief";
 import { writeHooks } from "./04-write-hooks";
@@ -7,7 +9,7 @@ import { planTimelines } from "./05-plan-timelines";
 import { compose } from "./08-compose";
 import { checkRules } from "./09-check-rules";
 import { packagePack } from "./10-package";
-import { DRAFT_SPECS } from "@/lib/specs/outputs";
+import { DRAFT_SPECS, draftSpecsFor } from "@/lib/specs/outputs";
 import type { PackPayload } from "./payload";
 
 // The pipeline pauses for the user twice (edit brief + pick hooks, then pay),
@@ -37,7 +39,9 @@ export const renderDrafts = task({
   id: "render-drafts",
   retry: { maxAttempts: 1 },
   run: async ({ packId }: PackPayload) => {
-    const specs = DRAFT_SPECS;
+    const { pack } = await loadPackWithApp(packId);
+    const chosen = ChosenHooks.parse(pack.chosen_hooks ?? { social: [], headline: null });
+    const specs = draftSpecsFor(variantHooks(chosen, (pack.hooks_json ?? []) as Hook[]));
     await planTimelines.triggerAndWait({ packId, specs }).unwrap();
     // generateScenes (M3) and voiceCaptions (M5) join here once their outputs are in DRAFT_SPECS.
     const { rendered } = await compose.triggerAndWait({ packId, specs, final: false }).unwrap();

@@ -6,7 +6,9 @@ import { readyClips } from "@/lib/packs";
 import { Listing } from "@/lib/schemas/listing";
 import { ChosenHooks } from "@/lib/schemas/hooks";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { DRAFT_SPECS } from "@/lib/specs/outputs";
+import { draftSpecsFor } from "@/lib/specs/outputs";
+import { variantHooks } from "@/lib/timeline/variants";
+import type { Hook } from "@/lib/schemas/hooks";
 import type { renderDrafts } from "@/trigger/pipelines";
 
 /** Start (or restart) the drafts run once the brief, picks and recording are all in. */
@@ -28,9 +30,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ packId
     }
   }
 
-  await supabaseAdmin()
+  const specs = draftSpecsFor(variantHooks(chosen.data, (pack.hooks_json ?? []) as Hook[]));
+  const db = supabaseAdmin();
+  // Drop outputs this run won't make (say a variant whose hook was unpicked) so the page doesn't wait on them.
+  await db.from("outputs").delete().eq("pack_id", pack.id).not("spec", "in", `(${specs.join(",")})`);
+  await db
     .from("outputs")
-    .upsert(DRAFT_SPECS.map((spec) => ({ pack_id: pack.id, spec, status: "queued" as const, error: null })), { onConflict: "pack_id,spec" });
+    .upsert(specs.map((spec) => ({ pack_id: pack.id, spec, status: "queued" as const, error: null })), { onConflict: "pack_id,spec" });
   await tasks.trigger<typeof renderDrafts>("render-drafts", { packId: pack.id });
   return NextResponse.json({ ok: true });
 }

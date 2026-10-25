@@ -7,6 +7,10 @@ export type OutputSpecId =
   | "preview"
   | "header"
   | "search"
+  | "header_b"
+  | "header_c"
+  | "search_b"
+  | "search_c"
   | "social_1"
   | "social_2"
   | "social_3"
@@ -39,6 +43,9 @@ export interface OutputSpec {
    * Header and search are cropped differently on iPhone, iPad and Mac.
    */
   safeArea?: { w: number; h: number };
+  /** A/B set: the output this is a variant of, and its letter (the base output is "A"). */
+  variantOf?: "header" | "search";
+  variant?: "B" | "C";
 }
 
 const social = (n: 1 | 2 | 3 | 4 | 5): OutputSpec => ({
@@ -59,7 +66,17 @@ const social = (n: 1 | 2 | 3 | 4 | 5): OutputSpec => ({
   targetSeconds: 20,
 });
 
-export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
+/** Same cut as the base output with a different hook, for Product Page Optimization tests. */
+const variant = (base: OutputSpec, letter: "B" | "C"): OutputSpec => ({
+  ...base,
+  id: `${base.id}_${letter.toLowerCase()}` as OutputSpecId,
+  label: `${base.label} ${letter}`,
+  fileName: base.fileName.replace(".mp4", `-${letter.toLowerCase()}.mp4`),
+  variantOf: base.id as "header" | "search",
+  variant: letter,
+});
+
+const BASE_SPECS = {
   preview: {
     id: "preview",
     placement: "appstore",
@@ -121,7 +138,18 @@ export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
   social_3: social(3),
   social_4: social(4),
   social_5: social(5),
+} satisfies Partial<Record<OutputSpecId, OutputSpec>>;
+
+export const OUTPUT_SPECS: Record<OutputSpecId, OutputSpec> = {
+  ...BASE_SPECS,
+  header_b: variant(BASE_SPECS.header as OutputSpec, "B"),
+  header_c: variant(BASE_SPECS.header as OutputSpec, "C"),
+  search_b: variant(BASE_SPECS.search as OutputSpec, "B"),
+  search_c: variant(BASE_SPECS.search as OutputSpec, "C"),
 };
+
+/** Up to two extra hooks become variants B and C of the header and search videos. */
+export const VARIANT_SPECS: OutputSpecId[] = ["header_b", "search_b", "header_c", "search_c"];
 
 export const PACK_OUTPUTS = Object.keys(OUTPUT_SPECS) as OutputSpecId[];
 
@@ -130,6 +158,12 @@ export const DRAFT_SCALE = 1 / 3;
 
 /** Outputs the drafts run produces so far; grows with each milestone (M5: social). */
 export const DRAFT_SPECS: OutputSpecId[] = ["preview", "header", "search"];
+
+/** The drafts to make for a pack: the base set, plus a B and C variant for each extra hook available. */
+export function draftSpecsFor(variantHooks: string[]): OutputSpecId[] {
+  const letters = (["B", "C"] as const).slice(0, variantHooks.length);
+  return [...DRAFT_SPECS, ...VARIANT_SPECS.filter((id) => letters.includes(OUTPUT_SPECS[id].variant!))];
+}
 
 /** Landscape outputs (header, search) lay the portrait recording out on a stage instead of filling the frame. */
 export const isLandscape = (spec: Pick<OutputSpec, "width" | "height">) => spec.width > spec.height;
