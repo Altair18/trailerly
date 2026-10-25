@@ -1,4 +1,4 @@
-import { additionalFiles, ffmpeg } from "@trigger.dev/build/extensions/core";
+import { additionalFiles, aptGet, ffmpeg } from "@trigger.dev/build/extensions/core";
 import { defineConfig } from "@trigger.dev/sdk";
 
 export default defineConfig({
@@ -16,6 +16,14 @@ export default defineConfig({
     // they are installed in the image. The renderer downloads its headless browser on first render.
     extensions: [
       ffmpeg(),
+      // System libraries Remotion's headless Chrome needs on Debian.
+      aptGet({
+        packages: [
+          "libnss3", "libdbus-1-3", "libatk1.0-0", "libgbm-dev", "libasound2", "libxrandr2",
+          "libxkbcommon-dev", "libxfixes3", "libxcomposite1", "libxdamage1", "libatk-bridge2.0-0",
+          "libpango-1.0-0", "libcairo2", "libcups2",
+        ],
+      }),
       additionalFiles({
         files: ["./src/remotion/**", "./src/lib/specs/**", "./src/lib/timeline/**"],
       }),
