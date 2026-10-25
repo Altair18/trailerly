@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
 import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
-import { chromeCrop, cutClip, frameAt, normalise, poster, probe, sceneChanges } from "@/lib/media/ffmpeg";
+import { blurRegions, chromeCrop, cutClip, frameAt, normalise, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
 import { generateJson } from "@/lib/llm/claude";
 import { Brief } from "@/lib/schemas/brief";
 import type { Clip } from "@/lib/schemas/clips";
@@ -15,7 +15,8 @@ import type { PackPayload } from "./payload";
 /**
  * Stage 2: ffprobe the upload, cut the phone's status and gesture bars, convert to 30 fps,
  * split at scene changes (ffmpeg scene filter), keep 3 to 6 clips of at least 2 seconds,
- * then have Claude label each clip and flag personal data from a few frames.
+ * then have Claude label each clip and flag personal data from a few frames, and blur
+ * the areas it marks so those clips are safe to use.
  */
 export const prepareRecording = task({
   id: "prepare-recording",
@@ -62,6 +63,7 @@ export const prepareRecording = task({
           generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048 }),
         );
         for (const clip of clips) if (notes[clip.id]) clip.notes = notes[clip.id];
+        await blurPrivateClips(clips, dir, packId, await probe(norm));
       } catch (err) {
         logger.warn("Clip check failed; continuing without notes", { packId, error: (err as Error).message });
       }
@@ -87,4 +89,34 @@ async function sampleFrames(clipFile: string, dir: string, n: number, duration: 
     out.push(await readFile(file));
   }
   return out;
+}
+
+/** Share of the frame that can be blurred before a clip isn't worth showing. */
+const MAX_BLUR_SHARE = 0.45;
+
+/**
+ * Blur the regions Claude marked in each private clip, re-upload the clip and its poster,
+ * and mark it blurred. Mostly-blurred clips also lose interest so the planner prefers others.
+ */
+async function blurPrivateClips(clips: Clip[], dir: string, packId: string, size: { width: number; height: number }) {
+  for (const [i, clip] of clips.entries()) {
+    const regions = clip.notes?.personal_info ? clip.notes.private_regions ?? [] : [];
+    const rects = toPixels(regions, size.width, size.height);
+    if (!clip.notes || rects.length === 0) continue;
+    const n = i + 1;
+    const src = join(dir, `clip-${n}.mp4`);
+    const out = join(dir, `clip-${n}-blur.mp4`);
+    const posterFile = join(dir, `clip-${n}-blur.jpg`);
+    await blurRegions(src, out, rects);
+    await poster(out, posterFile, Math.min(0.5, clip.duration / 2));
+    await uploadFile(clip.path, out, "video/mp4");
+    await uploadFile(clip.poster_path, posterFile, "image/jpeg");
+    const share = rects.reduce((a, r) => a + r.w * r.h, 0) / (size.width * size.height);
+    clip.notes = {
+      ...clip.notes,
+      blurred: true,
+      interest: share > MAX_BLUR_SHARE ? Math.max(1, clip.notes.interest - 2) : clip.notes.interest,
+    };
+    logger.info("Blurred private areas", { packId, clip: clip.id, regions: rects.length, share: Math.round(share * 100) });
+  }
 }

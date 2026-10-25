@@ -17,9 +17,10 @@ export const totalSeconds = (timeline: Timeline) => Math.max(...timeline.segment
 /**
  * Code-side checks on a model-planned timeline (pipeline stage 5).
  * Returns a list of human-readable errors to feed back to the model; empty means OK.
- * Pass `clipSeconds` (clip id -> length) to also check screen segments fit their clips.
+ * Pass `clipSeconds` (clip id -> length) to also check screen segments fit their clips,
+ * and `imageIds` to check screenshot segments name a known screenshot.
  */
-export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: Record<string, number>): string[] {
+export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: Record<string, number>, imageIds?: string[]): string[] {
   const errors: string[] = [];
   const segs = timeline.segments;
 
@@ -33,6 +34,10 @@ export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: 
       errors.push(`Segment type "${s.type}" is not allowed in ${spec.label}.`);
     }
     if (s.type === "screen" && !s.clip_id) errors.push(`Screen segment at ${s.start}s has no clip_id.`);
+    if (s.type === "screenshot" && !s.image_id) errors.push(`Screenshot segment at ${s.start}s has no image_id.`);
+    if (s.type === "screenshot" && s.image_id && imageIds && !imageIds.includes(s.image_id)) {
+      errors.push(`Unknown screenshot "${s.image_id}" at ${s.start}s.`);
+    }
     if (s.type === "ai_scene" && !s.prompt) errors.push(`AI scene at ${s.start}s has no prompt.`);
     if ((s.type === "text" || s.type === "end_card") && !s.text?.trim() && s.style !== "brand") {
       errors.push(`Text at ${s.start}s is empty.`);
@@ -87,7 +92,7 @@ export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: 
   }
 
   if (spec.minScreenShare > 0 && total > 0) {
-    const share = sumSeconds(timeline, "screen") / total;
+    const share = (sumSeconds(timeline, "screen") + sumSeconds(timeline, "screenshot")) / total;
     if (share < spec.minScreenShare) {
       errors.push(
         `Real screens are ${Math.round(share * 100)}% of the time; at least ${spec.minScreenShare * 100}% is required.`,

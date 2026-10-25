@@ -14,6 +14,20 @@ export const previewNoAiScenes: Rule = {
       : { rule: "preview_no_ai_scene", result: "pass" },
 };
 
+export const previewScreenshots: Rule = {
+  id: "preview_screenshots",
+  kind: "plain",
+  appliesTo: (s) => s.id === "preview",
+  check: ({ timeline }) =>
+    timeline.segments.some((s) => s.type === "screenshot")
+      ? {
+          rule: "preview_screenshots",
+          result: "warn",
+          detail: "Uses App Store screenshots, not a screen recording. Apple asks for captured footage (2.3.4) and may reject it. Upload a recording for a safe preview.",
+        }
+      : { rule: "preview_screenshots", result: "pass" },
+};
+
 export const lengthInSpec: Rule = {
   id: "length_in_spec",
   kind: "plain",
@@ -85,6 +99,7 @@ export const aiScenesLabelled: Rule = {
 
 export const PLAIN_RULES: Rule[] = [
   previewNoAiScenes,
+  previewScreenshots,
   lengthInSpec,
   noPrices,
   noSuperlatives,

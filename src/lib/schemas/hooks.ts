@@ -2,14 +2,20 @@ import { z } from "zod";
 
 export const HookFormat = z.enum(["pov", "problem", "before_after", "list", "question"]);
 
+export const MAX_HOOK_WORDS = 8;
+export const hookWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+
 export const Hook = z.object({
-  text: z.string().refine((t) => t.trim().split(/\s+/).length <= 8, "8 words or fewer"),
+  text: z.string().refine((t) => hookWords(t) <= MAX_HOOK_WORDS, `${MAX_HOOK_WORDS} words or fewer`),
   format: HookFormat,
 });
 export type Hook = z.infer<typeof Hook>;
 
-/** What the model returns per call; the pipeline tops up to HOOK_COUNT across calls. */
-export const HookSet = z.object({ hooks: z.array(Hook).min(1).max(10) });
+/**
+ * What the model returns per call. Lenient on length on purpose: one over-long hook must not
+ * throw away the whole batch; collectHooks drops it and tells the model on the next round.
+ */
+export const HookSet = z.object({ hooks: z.array(z.object({ text: z.string(), format: HookFormat })).min(1).max(20) });
 export type HookSet = z.infer<typeof HookSet>;
 
 export const HOOK_COUNT = 10;

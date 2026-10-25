@@ -31,6 +31,7 @@ export const renderSmoke = task({
             ],
           },
           clipUrls: {},
+          imageUrls: {},
           watermark: true,
           loop: false,
           baseWidth: spec.width,

@@ -49,3 +49,28 @@ describe("validateChosen", () => {
     expect(validateChosen({ social: ["A", "A"], headline: null }, proposed)).toMatch(/once/);
   });
 });
+
+describe("collectHooks length", () => {
+  it("drops over-long hooks instead of failing the batch, and re-asks", async () => {
+    const { collectHooks } = await import("@/lib/hooks");
+    let calls = 0;
+    const rejectedSeen: string[][] = [];
+    const hooks = await collectHooks(
+      async ({ count, rejected }) => {
+        calls++;
+        rejectedSeen.push(rejected);
+        if (calls === 1) {
+          return [
+            { text: "This hook is far too long to fit on one screen", format: "problem" },
+            ...Array.from({ length: 5 }, (_, i) => ({ text: `Short hook ${i}`, format: "pov" as const })),
+          ];
+        }
+        return Array.from({ length: count }, (_, i) => ({ text: `More hook ${i}`, format: "list" as const }));
+      },
+      async () => true,
+    );
+    expect(hooks).toHaveLength(10);
+    expect(hooks.every((h) => h.text.split(" ").length <= 8)).toBe(true);
+    expect(rejectedSeen[1]?.[0]).toMatch(/over 8 words/);
+  });
+});

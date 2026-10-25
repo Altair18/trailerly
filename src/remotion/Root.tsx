@@ -34,6 +34,7 @@ export function RemotionRoot() {
                 ],
               },
               clipUrls: {},
+              imageUrls: {},
               watermark: true,
               loop: spec.loop,
               baseWidth: spec.width,

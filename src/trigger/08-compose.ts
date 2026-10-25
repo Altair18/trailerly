@@ -2,7 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, metadata, task } from "@trigger.dev/sdk";
+import { appScreenshots } from "@/lib/media/screenshots";
 import { loadPackWithApp, readyClips } from "@/lib/packs";
+import { Listing } from "@/lib/schemas/listing";
 import { renderOutput } from "@/lib/render";
 import { DRAFT_SCALE, OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { paths, signedUrls, uploadFile } from "@/lib/storage";
@@ -25,6 +27,8 @@ export const compose = task({
     const clips = await readyClips(packId);
     const urls = await signedUrls(clips.map((c) => c.path), 6 * 3600);
     const clipUrls = Object.fromEntries(clips.map((c) => [c.id, urls[c.path]!]));
+    const listing = Listing.safeParse(app.listing_json);
+    const imageUrls = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
 
     const dir = await mkdtemp(join(tmpdir(), "render-"));
     try {
@@ -41,6 +45,7 @@ export const compose = task({
             props: {
               timeline: Timeline.parse(output.timeline_json),
               clipUrls,
+              imageUrls,
               watermark: true,
               loop: spec.loop,
               baseWidth: spec.width,

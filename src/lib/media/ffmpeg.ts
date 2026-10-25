@@ -91,3 +91,47 @@ export async function poster(input: string, output: string, at = 0.5): Promise<v
     maxBuffer: MAX_BUFFER,
   });
 }
+
+export interface PixelRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Fractional regions to even pixel rectangles inside a width x height frame (tiny ones dropped). */
+export function toPixels(regions: { x: number; y: number; w: number; h: number }[], width: number, height: number): PixelRegion[] {
+  const even = (n: number) => Math.max(0, Math.floor(n / 2) * 2);
+  return regions
+    .map((r) => {
+      const x = even(Math.min(Math.max(r.x, 0), 1) * width);
+      const y = even(Math.min(Math.max(r.y, 0), 1) * height);
+      const w = even(Math.min(r.w * width, width - x));
+      const h = even(Math.min(r.h * height, height - y));
+      return { x, y, w, h };
+    })
+    .filter((r) => r.w >= 16 && r.h >= 16);
+}
+
+/** filter_complex that blurs each rectangle heavily and lays it back over the frame. */
+export function blurFilterGraph(rects: PixelRegion[]): string {
+  const n = rects.length;
+  const parts = [`[0:v]split=${n + 1}[base]${rects.map((_, i) => `[r${i}]`).join("")}`];
+  rects.forEach((r, i) => parts.push(`[r${i}]crop=${r.w}:${r.h}:${r.x}:${r.y},boxblur=luma_radius=min(w\\,h)/6:luma_power=3[b${i}]`));
+  let last = "base";
+  rects.forEach((r, i) => {
+    const out = i === n - 1 ? "out" : `v${i}`;
+    parts.push(`[${last}][b${i}]overlay=${r.x}:${r.y}[${out}]`);
+    last = out;
+  });
+  return parts.join(";");
+}
+
+/** Re-encode a clip with the given rectangles blurred for its whole length. */
+export async function blurRegions(input: string, output: string, rects: PixelRegion[]): Promise<void> {
+  await run(
+    "ffmpeg",
+    ["-y", "-v", "error", "-i", input, "-filter_complex", blurFilterGraph(rects), "-map", "[out]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", output],
+    { maxBuffer: MAX_BUFFER },
+  );
+}

@@ -185,7 +185,7 @@ export function RecordingUpload({ packId }: { packId: string }) {
         <div className="actionbar">
           <span style={{ flex: "1 1 260px" }}>
             <b>{state === "done" ? "Recording ready." : "No recording yet."}</b>{" "}
-            <span className="mu">{state === "done" ? "Next, check the brief and pick your hooks." : "You can check the brief while it uploads."}</span>
+            <span className="mu">{state === "done" ? "Next, check the brief and pick your hooks." : state === "empty" ? "No recording? We'll use your App Store screenshots instead." : "You can check the brief while it uploads."}</span>
           </span>
           <Link className="btn btn-primary" href={`/packs/${packId}`}>Check the brief</Link>
         </div>

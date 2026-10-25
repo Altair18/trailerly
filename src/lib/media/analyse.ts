@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ClipNotes } from "@/lib/schemas/clips";
+import { ClipNotes, isPrivate } from "@/lib/schemas/clips";
 
 export const ANALYSE_SYSTEM = `You look at frames from a screen recording of a mobile app and describe each clip
 for a video editor making an App Store preview and short ads.
@@ -10,7 +10,11 @@ For every clip give:
 - personal_info: true if the frames show real personal data that is not the app's own demo content:
   people's names, email addresses, phone numbers, real message or chat titles, notifications, faces of private people.
 - privacy_note: one short phrase saying what and where, or null.
-Return JSON: {"clips": [{"clip_id": "...", "label": "...", "feature": ... , "interest": n, "personal_info": bool, "privacy_note": ...}]}.`;
+- private_regions: when personal_info is true, rectangles covering all of it in every frame of that clip, as fractions
+  of the frame: {"x": left, "y": top, "w": width, "h": height}, each 0 to 1. Be generous (cover whole lists or
+  panels, not single words) and merge overlapping areas. Empty list when personal_info is false.
+Return JSON: {"clips": [{"clip_id": "...", "label": "...", "feature": ... , "interest": n, "personal_info": bool,
+"privacy_note": ..., "private_regions": [...]}]}.`;
 
 export const ClipNotesReply = z.object({
   clips: z.array(ClipNotes.extend({ clip_id: z.string() })),
@@ -44,9 +48,9 @@ export async function analyseClips(
   return Object.fromEntries(reply.clips.map(({ clip_id, ...notes }) => [clip_id, notes]));
 }
 
-/** Clips ordered best first, with clips that leak personal data last. */
+/** Clips ordered best first, with clips that still show personal data last. */
 export function rankClips<T extends { id: string; notes?: ClipNotes }>(clips: T[]): T[] {
-  const score = (c: T) => (c.notes?.personal_info ? -10 : 0) + (c.notes?.interest ?? 3);
+  const score = (c: T) => (isPrivate(c.notes) ? -10 : 0) + (c.notes?.interest ?? 3);
   return clips
     .map((c, i) => ({ c, i }))
     .sort((a, b) => score(b.c) - score(a.c) || a.i - b.i)

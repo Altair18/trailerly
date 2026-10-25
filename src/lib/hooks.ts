@@ -1,5 +1,5 @@
 import { checkText, worst } from "@/lib/rules";
-import { type ChosenHooks, HOOK_COUNT, type Hook } from "@/lib/schemas/hooks";
+import { type ChosenHooks, HOOK_COUNT, type Hook, hookWords, MAX_HOOK_WORDS } from "@/lib/schemas/hooks";
 import { OUTPUT_SPECS } from "@/lib/specs/outputs";
 
 export const MAX_HOOK_ROUNDS = 3;
@@ -31,7 +31,8 @@ export async function collectHooks(
       const key = hook.text.trim().toLowerCase();
       if (seen.has(key) || kept.length >= HOOK_COUNT) continue;
       seen.add(key);
-      if (await passes(hook)) kept.push(hook);
+      if (hookWords(hook.text) > MAX_HOOK_WORDS) rejected.push(`${hook.text} (over ${MAX_HOOK_WORDS} words)`);
+      else if (await passes(hook)) kept.push(hook);
       else rejected.push(hook.text);
     }
   }
