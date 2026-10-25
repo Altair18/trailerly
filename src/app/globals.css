@@ -1,0 +1,17 @@
+:root {
+  --bg: #ffffff;
+  --fg: #111114;
+  --muted: #6b6b76;
+  --accent: #5b4bff;
+  --border: #e4e4ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0b0b0f; --fg: #f2f2f5; --muted: #9a9aa6; --border: #26262e; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; line-height: 1.5; }
+main { max-width: 720px; margin: 0 auto; padding: 48px 16px; }
+input, button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); }
+button { background: var(--accent); color: white; border: none; cursor: pointer; }
+.muted { color: var(--muted); }
+ol.steps li { margin-bottom: 4px; }
