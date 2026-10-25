@@ -72,7 +72,8 @@ export const prepareRecording = task({
         const notes = await analyseClips(
           frames,
           brief.success ? brief.data.features : [],
-          (opts) => generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 4096, effort: "medium" }),
+          // Privacy matters most here and it runs once per recording, so it gets the main model.
+          (opts) => generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 4096, tier: "smart", effort: "medium" }),
           shotList.success ? shotList.data.shots.map((s) => s.action) : undefined,
         );
         for (const clip of clips) if (notes[clip.id]) clip.notes = notes[clip.id];
