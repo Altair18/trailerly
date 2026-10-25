@@ -2,13 +2,12 @@ import type { Brief } from "@/lib/schemas/brief";
 import type { Clip } from "@/lib/schemas/clips";
 import { SCREENSHOT_SECONDS, type Screenshot } from "@/lib/media/screenshots";
 import { isPrivate } from "@/lib/schemas/clips";
-import { MAX_OVERLAY_WORDS } from "./enforce";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { enforceSpec } from "./enforce";
 import { fallbackTimeline } from "./preview";
 import type { Timeline } from "./schema";
-
-export const MAX_REPLANS = 2;
+import { buildFromTemplate, templatePrompt, templatesFor, type TemplateFill } from "./templates";
+import type { Tier } from "@/lib/llm/claude";
 
 export interface PlanContext {
   brief: Brief;
@@ -17,70 +16,15 @@ export interface PlanContext {
   clips: Pick<Clip, "id" | "duration" | "notes" | "idle">[];
   /** App Store screenshots, for when footage is missing, short or private. */
   screenshots?: Pick<Screenshot, "id" | "notes">[];
+  /** Templates used by sibling outputs in this pack, skipped while others are left (variety). */
+  avoidTemplates?: string[];
 }
 
-export type Generate = (prompt: string) => Promise<Timeline>;
+/** One model call: the prompt and which tier answers it. */
+export type Generate = (prompt: string, tier: Tier) => Promise<TemplateFill>;
 
-export const PLANNER_SYSTEM = `You edit short app videos. You plan them as a timeline of segments.
-Each segment: {"type": "screen" | "screenshot" | "ai_scene" | "text" | "end_card", "start": seconds, "duration": seconds,
-"clip_id": for screen, "image_id": for screenshot, "clip_offset": seconds into the clip (default 0), "prompt": for ai_scene, "text": for text and end_card,
-"overlay": true for text drawn over the segment underneath, "style": "hook" | "caption" | "brand" for overlays}.
-
-Story: open on the strongest moment with a "hook" overlay (the promise, 0 to 3 s), then 2 to 4 feature beats, each a
-screen segment with a "caption" overlay naming what the viewer is seeing, and finish with a "brand" overlay
-(app icon and name, no text needed) over the last 2 to 3 seconds. Where the spec allows end_card, end on one instead.
-
-On-screen text is written for video, not copied from the listing: ${MAX_OVERLAY_WORDS} words at most, plain and
-concrete ("Snap a photo, get an answer"), in the brief's tone. Each line stays up for at least 0.3 s per word
-(minimum 1.2 s), lines never overlap, and each caption starts with the screen segment it describes.
-
-Clips: each comes with a label, the feature it shows and an interest score (1 to 5). Use the highest-interest clips,
-match captions to what the clip shows, and you may use part of a clip (clip_offset + duration) to skip slow bits.
-A clip's dead_time lists stretches where nothing moves on screen ({start, duration} in seconds): leave them out.
-Never use a clip marked personal_info unless there is no other way to reach the minimum length.
-
-Screenshots: still App Store screenshots, animated for you. Use them (2 to 4 s each, with a caption) only when the
-clips are missing, too short to reach the minimum length, or private. Real clips always come first.
-
-Header and search (landscape App Store videos, new in iOS 27): the phone recording is shown on a stage beside your
-text, so keep them short and simple: aim for target_seconds, one hook line held over the first 3 to 5 s, then 1 or 2
-caption beats, and the brand overlay last. The header loops, so end on a calm moment that cuts cleanly back to the
-start. The search video is always muted and shown small in results, so the first 2 seconds must be the best moment.
-
-Rules: the non-overlay segments play back to back from 0 with no gaps or overlaps. A screen segment must not run past
-the end of its clip (clip_offset + duration <= clip length). Only use segment types the spec allows.
-Return JSON: {"segments": [...]}.`;
-
-export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: string): string {
-  return JSON.stringify({
-    output: {
-      name: spec.label,
-      seconds: [spec.minSeconds, spec.maxSeconds],
-      target_seconds: spec.targetSeconds,
-      loops: spec.loop || undefined,
-      allowed_segments: spec.allowedSegments,
-      max_ai_seconds: spec.maxAiSeconds,
-      min_real_screen_share: spec.minScreenShare,
-      sound: spec.sound,
-    },
-    headline: ctx.headline,
-    hook: ctx.socialHook ?? undefined,
-    brief: ctx.brief,
-    clips: ctx.clips.map((c) => ({
-      clip_id: c.id,
-      seconds: c.duration,
-      shows: c.notes?.label,
-      feature: c.notes?.feature ?? undefined,
-      interest: c.notes?.interest,
-      personal_info: isPrivate(c.notes) || undefined,
-      dead_time: c.idle?.length ? c.idle : undefined,
-    })),
-    screenshots: ctx.screenshots?.length
-      ? ctx.screenshots.map((s) => ({ image_id: s.id, shows: s.notes?.label, feature: s.notes?.feature ?? undefined, interest: s.notes?.interest }))
-      : undefined,
-    fix_these_errors_from_your_last_plan: feedback || undefined,
-  });
-}
+/** The fast model fills the template first; a plan that fails the checks gets one retry on the main model. */
+export const PLAN_TIERS: Tier[] = ["fast", "smart"];
 
 /**
  * Clips the planner may use: clips that still show personal data are left out whenever the clean ones
@@ -96,31 +40,39 @@ export function safeClips<T extends Pick<Clip, "id" | "duration" | "notes">>(
 }
 
 /**
- * Ask the model for a timeline, check it in code, and re-ask with the errors up to MAX_REPLANS times.
- * App Store outputs fall back to a code-built timeline so they never block the pack.
+ * Plan an output from a template: the fast model picks a template and fills it, code builds the timeline and
+ * checks it against the spec. Errors go back with one retry on the main model, and if that fails too the
+ * code-built cut is used so the pack never blocks on the model.
  */
 export async function planTimeline(
   spec: OutputSpec,
   ctx: PlanContext,
   generate: Generate,
-): Promise<{ timeline: Timeline; source: "model" | "fallback"; attempts: number }> {
+): Promise<{ timeline: Timeline; source: Tier | "fallback"; attempts: number; errors: string[] }> {
   ctx = { ...ctx, clips: safeClips(ctx.clips, spec, (ctx.screenshots?.length ?? 0) * SCREENSHOT_SECONDS) };
   const clipSeconds = Object.fromEntries(ctx.clips.map((c) => [c.id, c.duration]));
   const imageIds = (ctx.screenshots ?? []).map((s) => s.id);
+  const hook = ctx.socialHook ?? ctx.headline;
+  const templates = templatesFor(spec, ctx.avoidTemplates);
+  const fillCtx = { hook, clips: ctx.clips, screenshots: ctx.screenshots, brief: ctx.brief };
   let feedback = "";
-  for (let attempt = 1; attempt <= MAX_REPLANS + 1; attempt++) {
+  const seen: string[] = [];
+  for (const [i, tier] of PLAN_TIERS.entries()) {
     try {
-      const timeline = await generate(plannerPrompt(spec, ctx, feedback));
-      const errors = enforceSpec(timeline, spec, clipSeconds, imageIds);
-      if (errors.length === 0) return { timeline, source: "model", attempts: attempt };
+      const fill = await generate(templatePrompt(spec, fillCtx, templates, feedback), tier);
+      const template = templates.find((t) => t.id === fill.template_id);
+      if (!template) throw new Error(`Unknown template "${fill.template_id}"; pick one of ${templates.map((t) => t.id).join(", ")}.`);
+      const built = buildFromTemplate(template, fill, spec, fillCtx);
+      const errors = built.timeline ? enforceSpec(built.timeline, spec, clipSeconds, imageIds) : built.errors;
+      if (built.timeline && errors.length === 0) {
+        return { timeline: { ...built.timeline, planned_by: tier }, source: tier, attempts: i + 1, errors: seen };
+      }
       feedback = errors.join(" ");
     } catch (err) {
-      feedback = `Your reply could not be read: ${(err as Error).message}`;
+      feedback = `Your reply could not be used: ${(err as Error).message}`;
     }
+    seen.push(feedback);
   }
-  // App Store outputs fall back to a code-built cut so the pack never blocks on the model.
-  if (spec.placement === "appstore") {
-    return { timeline: fallbackTimeline(ctx.clips, ctx.headline, spec, ctx.screenshots), source: "fallback", attempts: MAX_REPLANS + 1 };
-  }
-  throw new Error(`Couldn't plan a valid ${spec.label} timeline: ${feedback}`);
+  const timeline = fallbackTimeline(ctx.clips, hook, spec, ctx.screenshots);
+  return { timeline: { ...timeline, planned_by: "fallback" }, source: "fallback", attempts: PLAN_TIERS.length, errors: seen };
 }

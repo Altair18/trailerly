@@ -49,26 +49,52 @@ describe("enforceSpec on screen timelines", () => {
   });
 });
 
-describe("planTimeline", () => {
-  it("re-asks with errors, then accepts a valid plan", async () => {
-    const prompts: string[] = [];
-    const bad: Timeline = { segments: [{ type: "ai_scene", start: 0, duration: 20, prompt: "sunrise" }] };
-    const result = await planTimeline(OUTPUT_SPECS.preview, ctx, async (p) => {
-      prompts.push(p);
-      return prompts.length === 1 ? bad : good;
+describe("planTimeline with templates", () => {
+  const fill = {
+    template_id: "promise-tour",
+    beats: [
+      { source: "clip_2" },
+      { source: "clip_3", caption: "Water reminders that adapt" },
+      { source: "clip_4", caption: "Snap a leaf, get a fix" },
+      { source: "clip_1", caption: "Track every plant" },
+      { source: "clip_2", offset: 3 },
+    ],
+  };
+
+  it("takes the fast model's fill when it builds a valid plan", async () => {
+    const tiers: string[] = [];
+    const result = await planTimeline(OUTPUT_SPECS.preview, ctx, async (_p, tier) => {
+      tiers.push(tier);
+      return fill;
     });
-    expect(result).toMatchObject({ source: "model", attempts: 2 });
-    expect(prompts[1]).toMatch(/not allowed/);
+    expect(tiers).toEqual(["fast"]);
+    expect(result).toMatchObject({ source: "fast", attempts: 1 });
+    expect(result.timeline).toMatchObject({ template: "promise-tour", planned_by: "fast" });
+    expect(enforceSpec(result.timeline, OUTPUT_SPECS.preview, clipSeconds)).toEqual([]);
   });
 
-  it("falls back to a code-built preview after 3 failures", async () => {
+  it("retries once on the main model with the errors, then accepts", async () => {
+    const prompts: string[] = [];
+    const tiers: string[] = [];
+    const result = await planTimeline(OUTPUT_SPECS.preview, ctx, async (p, tier) => {
+      prompts.push(p);
+      tiers.push(tier);
+      return prompts.length === 1 ? { ...fill, beats: fill.beats.slice(0, 3) } : fill;
+    });
+    expect(tiers).toEqual(["fast", "smart"]);
+    expect(result).toMatchObject({ source: "smart", attempts: 2 });
+    expect(prompts[1]).toMatch(/has 5 beats; you filled 3/);
+  });
+
+  it("falls back to a code-built cut when both models fail", async () => {
     let n = 0;
     const result = await planTimeline(OUTPUT_SPECS.preview, ctx, async () => {
       n++;
       throw new Error("bad json");
     });
-    expect(n).toBe(3);
+    expect(n).toBe(2);
     expect(result.source).toBe("fallback");
+    expect(result.timeline.planned_by).toBe("fallback");
     expect(enforceSpec(result.timeline, OUTPUT_SPECS.preview, clipSeconds)).toEqual([]);
   });
 });

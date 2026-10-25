@@ -29,5 +29,9 @@ export const Timeline = z.object({
   segments: z.array(Segment).min(1),
   /** Voiceover script for social ads; App Store videos have none by default. */
   voiceover: z.string().optional(),
+  /** The cut template the plan was built from, so results can be compared per template later. */
+  template: z.string().optional(),
+  /** Which planner produced it: the fast model, the main model on retry, or the code fallback. */
+  planned_by: z.enum(["fast", "smart", "fallback"]).optional(),
 });
 export type Timeline = z.infer<typeof Timeline>;
