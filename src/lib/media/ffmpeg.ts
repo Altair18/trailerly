@@ -86,6 +86,61 @@ export async function frameAt(input: string, output: string, at: number, width =
   });
 }
 
+/** A region in pixels, clamped to the frame and rounded to even numbers (yuv420p needs even sizes). */
+export interface PixelBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Round to the nearest pixel first (so 79.9999 counts as 80), then down to an even number. */
+const even = (n: number) => Math.floor(Math.round(n) / 2) * 2;
+
+/**
+ * Turn fractional regions (0 to 1) into pixel boxes inside a `width` x `height` frame.
+ * Out-of-range values are clamped; boxes smaller than 16 px either way are dropped.
+ */
+export function toPixelBoxes(regions: { x: number; y: number; w: number; h: number }[], width: number, height: number): PixelBox[] {
+  const clamp = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0));
+  return regions.flatMap((r) => {
+    const x0 = clamp(r.x), y0 = clamp(r.y);
+    const x1 = clamp(r.x + r.w), y1 = clamp(r.y + r.h);
+    const box = { x: even(x0 * width), y: even(y0 * height), w: even((x1 - x0) * width), h: even((y1 - y0) * height) };
+    return box.w >= 16 && box.h >= 16 ? [box] : [];
+  });
+}
+
+/**
+ * ffmpeg filter graph that blurs each box heavily and lays it back over the frame.
+ * The radius is capped per box because boxblur can't exceed half the (chroma) plane size.
+ */
+export function blurFilter(boxes: PixelBox[]): string {
+  if (boxes.length === 0) return "[0:v]null[out]";
+  const parts = [`[0:v]split=${boxes.length + 1}[base]${boxes.map((_, i) => `[c${i}]`).join("")}`];
+  boxes.forEach((b, i) => {
+    const luma = Math.max(1, Math.min(30, Math.floor(Math.min(b.w, b.h) / 2) - 1));
+    const chroma = Math.max(1, Math.min(15, Math.floor(Math.min(b.w, b.h) / 4) - 1));
+    parts.push(`[c${i}]crop=${b.w}:${b.h}:${b.x}:${b.y},boxblur=luma_radius=${luma}:luma_power=3:chroma_radius=${chroma}:chroma_power=3[b${i}]`);
+  });
+  let prev = "base";
+  boxes.forEach((b, i) => {
+    const next = i === boxes.length - 1 ? "out" : `v${i}`;
+    parts.push(`[${prev}][b${i}]overlay=${b.x}:${b.y}[${next}]`);
+    prev = next;
+  });
+  return parts.join(";");
+}
+
+/** Re-encode `input` with the given boxes blurred for the whole clip. */
+export async function blurRegions(input: string, output: string, boxes: PixelBox[]): Promise<void> {
+  await run(
+    "ffmpeg",
+    ["-y", "-v", "error", "-i", input, "-filter_complex", blurFilter(boxes), "-map", "[out]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", output],
+    { maxBuffer: MAX_BUFFER },
+  );
+}
+
 export async function poster(input: string, output: string, at = 0.5): Promise<void> {
   await run("ffmpeg", ["-y", "-v", "error", "-ss", String(at), "-i", input, "-frames:v", "1", "-vf", "scale=360:-2", output], {
     maxBuffer: MAX_BUFFER,

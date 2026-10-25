@@ -1,5 +1,5 @@
 import { rankClips } from "@/lib/media/analyse";
-import type { Clip } from "@/lib/schemas/clips";
+import { type Clip, showsPersonalData } from "@/lib/schemas/clips";
 import type { OutputSpec } from "@/lib/specs/outputs";
 import { MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
 import type { Segment, Timeline } from "./schema";
@@ -22,7 +22,7 @@ export function shortLine(text: string, maxWords = MAX_OVERLAY_WORDS): string {
  */
 export function fallbackPreview(clips: Pick<Clip, "id" | "duration" | "notes">[], headline: string | null, spec: OutputSpec): Timeline {
   const usable = rankClips(clips);
-  const clean = usable.filter((c) => !c.notes?.personal_info);
+  const clean = usable.filter((c) => !showsPersonalData(c));
   const pool = clean.reduce((n, c) => n + c.duration, 0) >= spec.minSeconds ? clean : usable;
   const target = Math.min(spec.maxSeconds, pool.reduce((n, c) => n + c.duration, 0));
   const segments: Segment[] = [];

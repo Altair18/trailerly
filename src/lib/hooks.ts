@@ -1,5 +1,5 @@
 import { checkText, worst } from "@/lib/rules";
-import { type ChosenHooks, HOOK_COUNT, type Hook } from "@/lib/schemas/hooks";
+import { type ChosenHooks, fitsWordLimit, HOOK_COUNT, type Hook, type HookDraft, MAX_HOOK_WORDS } from "@/lib/schemas/hooks";
 import { OUTPUT_SPECS } from "@/lib/specs/outputs";
 
 export const MAX_HOOK_ROUNDS = 3;
@@ -10,11 +10,11 @@ export async function hookPasses(hook: Hook): Promise<boolean> {
 }
 
 /**
- * Ask for hooks until there are HOOK_COUNT unique ones that pass the rules,
- * telling the model which ones were rejected. Gives up after MAX_HOOK_ROUNDS.
+ * Ask for hooks until there are HOOK_COUNT unique ones that fit the word limit and pass the rules,
+ * telling the model which ones were rejected and why. Gives up after MAX_HOOK_ROUNDS.
  */
 export async function collectHooks(
-  generate: (args: { count: number; rejected: string[]; kept: string[] }) => Promise<Hook[]>,
+  generate: (args: { count: number; rejected: string[]; kept: string[] }) => Promise<HookDraft[]>,
   passes: (hook: Hook) => Promise<boolean> = hookPasses,
 ): Promise<Hook[]> {
   const kept: Hook[] = [];
@@ -31,7 +31,8 @@ export async function collectHooks(
       const key = hook.text.trim().toLowerCase();
       if (seen.has(key) || kept.length >= HOOK_COUNT) continue;
       seen.add(key);
-      if (await passes(hook)) kept.push(hook);
+      if (!fitsWordLimit(hook.text)) rejected.push(`${hook.text} (over ${MAX_HOOK_WORDS} words)`);
+      else if (await passes(hook)) kept.push(hook);
       else rejected.push(hook.text);
     }
   }

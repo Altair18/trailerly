@@ -21,6 +21,22 @@ describe("collectHooks", () => {
     expect(calls[1]).toEqual({ count: 2, rejected: ["Only $4.99 today"] });
   });
 
+  it("drops over-long hooks and asks again instead of failing the batch", async () => {
+    const calls: Array<{ count: number; rejected: string[] }> = [];
+    const long = "This hook has far too many words to fit on screen";
+    const batches = [
+      [...Array.from({ length: 9 }, (_, i) => hook(`Short hook ${i}`)), hook(long)],
+      [hook("Short hook 9")],
+    ];
+    const result = await collectHooks(async (args) => {
+      calls.push({ count: args.count, rejected: [...args.rejected] });
+      return batches[calls.length - 1] ?? [];
+    });
+    expect(result).toHaveLength(10);
+    expect(result.map((h) => h.text)).not.toContain(long);
+    expect(calls[1]).toEqual({ count: 1, rejected: [`${long} (over 8 words)`] });
+  });
+
   it("gives up after three rounds", async () => {
     let n = 0;
     const result = await collectHooks(async () => {

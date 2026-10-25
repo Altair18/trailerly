@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ClipNotes } from "@/lib/schemas/clips";
+import { ClipNotes, showsPersonalData } from "@/lib/schemas/clips";
 
 export const ANALYSE_SYSTEM = `You look at frames from a screen recording of a mobile app and describe each clip
 for a video editor making an App Store preview and short ads.
@@ -10,7 +10,11 @@ For every clip give:
 - personal_info: true if the frames show real personal data that is not the app's own demo content:
   people's names, email addresses, phone numbers, real message or chat titles, notifications, faces of private people.
 - privacy_note: one short phrase saying what and where, or null.
-Return JSON: {"clips": [{"clip_id": "...", "label": "...", "feature": ... , "interest": n, "personal_info": bool, "privacy_note": ...}]}.`;
+- privacy_regions: when personal_info is true, boxes covering every area of the screen that shows the personal data
+  in any of the clip's frames, as fractions of the frame: {"x": left, "y": top, "w": width, "h": height}, each 0 to 1.
+  The content may scroll between frames, so make each box cover the whole area where it appears, with a margin.
+  Cover a list as one box (e.g. a whole sidebar of chat titles), not one box per line. Up to 8 boxes. [] when none.
+Return JSON: {"clips": [{"clip_id": "...", "label": "...", "feature": ... , "interest": n, "personal_info": bool, "privacy_note": ..., "privacy_regions": [...]}]}.`;
 
 export const ClipNotesReply = z.object({
   clips: z.array(ClipNotes.extend({ clip_id: z.string() })),
@@ -44,9 +48,9 @@ export async function analyseClips(
   return Object.fromEntries(reply.clips.map(({ clip_id, ...notes }) => [clip_id, notes]));
 }
 
-/** Clips ordered best first, with clips that leak personal data last. */
+/** Clips ordered best first, with clips that still show personal data (not blurred) last. */
 export function rankClips<T extends { id: string; notes?: ClipNotes }>(clips: T[]): T[] {
-  const score = (c: T) => (c.notes?.personal_info ? -10 : 0) + (c.notes?.interest ?? 3);
+  const score = (c: T) => (showsPersonalData(c) ? -10 : 0) + (c.notes?.interest ?? 3);
   return clips
     .map((c, i) => ({ c, i }))
     .sort((a, b) => score(b.c) - score(a.c) || a.i - b.i)

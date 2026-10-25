@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
 import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
-import { chromeCrop, cutClip, frameAt, normalise, poster, probe, sceneChanges } from "@/lib/media/ffmpeg";
+import { blurRegions, chromeCrop, cutClip, frameAt, normalise, poster, probe, sceneChanges, toPixelBoxes } from "@/lib/media/ffmpeg";
 import { generateJson } from "@/lib/llm/claude";
 import { Brief } from "@/lib/schemas/brief";
 import type { Clip } from "@/lib/schemas/clips";
@@ -66,6 +66,28 @@ export const prepareRecording = task({
         logger.warn("Clip check failed; continuing without notes", { packId, error: (err as Error).message });
       }
 
+      // Blur the personal data the check found, in the stored clip itself, so no draft or final can show it.
+      for (const [i, clip] of clips.entries()) {
+        const regions = clip.notes?.personal_info ? clip.notes.privacy_regions ?? [] : [];
+        if (regions.length === 0) continue;
+        const n = i + 1;
+        const clipFile = join(dir, `clip-${n}.mp4`);
+        const { width, height } = await probe(clipFile);
+        const boxes = toPixelBoxes(regions, width, height);
+        if (boxes.length === 0) continue;
+        try {
+          const blurredFile = join(dir, `clip-${n}-blur.mp4`);
+          const posterFile = join(dir, `clip-${n}-blur.jpg`);
+          await blurRegions(clipFile, blurredFile, boxes);
+          await poster(blurredFile, posterFile, Math.min(0.5, clip.duration / 2));
+          await uploadFile(clip.path, blurredFile, "video/mp4");
+          await uploadFile(clip.poster_path, posterFile, "image/jpeg");
+          clip.notes!.blurred = true;
+        } catch (err) {
+          logger.warn("Couldn't blur personal data; the planner will avoid this clip", { packId, clip: clip.id, error: (err as Error).message });
+        }
+      }
+
       await db.from("sources").update({ status: "ready", duration_s: duration, clips_json: clips }).eq("id", sourceId);
       logger.info("Recording prepared", { packId, duration, clips: clips.length });
       return { clips };
@@ -78,10 +100,10 @@ export const prepareRecording = task({
   },
 });
 
-/** Two frames per clip (a quarter and three quarters in) for the vision check. */
+/** Three frames per clip (start, middle, end) so the privacy boxes cover content that scrolls. */
 async function sampleFrames(clipFile: string, dir: string, n: number, duration: number): Promise<Buffer[]> {
   const out: Buffer[] = [];
-  for (const [k, at] of [duration * 0.25, duration * 0.75].entries()) {
+  for (const [k, at] of [duration * 0.15, duration * 0.5, duration * 0.85].entries()) {
     const file = join(dir, `clip-${n}-f${k}.jpg`);
     await frameAt(clipFile, file, at);
     out.push(await readFile(file));
