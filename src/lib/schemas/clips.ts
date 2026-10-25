@@ -25,6 +25,8 @@ export const ClipNotes = z.object({
   private_regions: z.array(Region).optional(),
   /** True once those regions have been blurred in the stored clip. */
   blurred: z.boolean().optional(),
+  /** Which shot of the shot list (1-based) this clip films, when there was a shot list. */
+  shot: z.number().int().min(1).nullable().optional(),
 });
 export type ClipNotes = z.infer<typeof ClipNotes>;
 
@@ -36,9 +38,28 @@ export const Clip = z.object({
   path: z.string(),
   poster_path: z.string(),
   notes: ClipNotes.optional(),
+  /** Stretches where nothing moves on screen (seconds from the clip's start); the editor skips them. */
+  idle: z.array(z.object({ start: z.number(), duration: z.number() })).optional(),
 });
 export type Clip = z.infer<typeof Clip>;
 export const Clips = z.array(Clip);
 
 /** Still shows personal data: flagged and not (yet) blurred. */
 export const isPrivate = (notes?: ClipNotes | null) => Boolean(notes?.personal_info && !notes.blurred);
+
+/** Seconds of a clip where nothing happens. */
+export const idleSeconds = (clip: Pick<Clip, "idle">) => (clip.idle ?? []).reduce((n, s) => n + s.duration, 0);
+
+/** The longest stretch of a clip without dead time (the whole clip when there is none worth skipping). */
+export function liveRange(clip: Pick<Clip, "duration" | "idle">): { offset: number; duration: number } {
+  const idle = [...(clip.idle ?? [])].sort((a, b) => a.start - b.start);
+  let best = { offset: 0, duration: 0 };
+  let at = 0;
+  for (const span of [...idle, { start: clip.duration, duration: 0 }]) {
+    const len = span.start - at;
+    if (len > best.duration) best = { offset: at, duration: len };
+    at = Math.max(at, span.start + span.duration);
+  }
+  const r = (n: number) => Math.round(n * 100) / 100;
+  return best.duration >= 1 ? { offset: r(best.offset), duration: r(best.duration) } : { offset: 0, duration: clip.duration };
+}

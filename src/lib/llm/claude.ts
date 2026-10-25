@@ -9,6 +9,10 @@ function anthropic(): Anthropic {
   return client;
 }
 
+export type Tier = "fast" | "smart";
+
+export const modelFor = (tier: Tier) => (tier === "smart" ? env().ANTHROPIC_MODEL : env().ANTHROPIC_FAST_MODEL);
+
 export class SchemaError extends Error {
   constructor(message: string, readonly raw: string) {
     super(message);
@@ -26,6 +30,13 @@ export async function generateJson<T>(opts: {
   maxTokens?: number;
   /** JPEG frames to show the model before the prompt. */
   images?: { data: Buffer; label?: string }[];
+  /**
+   * "fast" (default) runs on the cheap model for labelling and short structured replies;
+   * "smart" runs on the main model for copy people read (brief, hooks, plans).
+   */
+  tier?: Tier;
+  /** Thinking effort; lower is cheaper. Defaults: fast -> low, smart -> medium. */
+  effort?: "low" | "medium" | "high";
 }): Promise<T> {
   const content: Anthropic.ContentBlockParam[] = [];
   for (const img of opts.images ?? []) {
@@ -33,13 +44,17 @@ export async function generateJson<T>(opts: {
     content.push({ type: "image", source: { type: "base64", media_type: imageType(img.data), data: img.data.toString("base64") } });
   }
   content.push({ type: "text", text: opts.prompt });
+  const tier = opts.tier ?? "fast";
   const res = await anthropic().messages.create({
-    model: env().ANTHROPIC_MODEL,
+    model: modelFor(tier),
     max_tokens: opts.maxTokens ?? 4096,
+    output_config: { effort: opts.effort ?? (tier === "fast" ? "low" : "medium") },
     system: `${opts.system}\n\nReply with a single JSON object and nothing else.`,
     messages: [{ role: "user", content }],
   });
 
+  if (res.stop_reason === "refusal") throw new SchemaError("The model declined this request", "");
+  if (res.stop_reason === "max_tokens") throw new SchemaError("The reply was cut off before it finished", "");
   const text = res.content
     .flatMap((block) => (block.type === "text" ? [block.text] : []))
     .join("");

@@ -136,6 +136,56 @@ export async function blurRegions(input: string, output: string, rects: PixelReg
   );
 }
 
+/**
+ * Grow privacy boxes so the blur doesn't stop just short of the text: pad every side, and snap to the frame's
+ * edge when the box is already close to it (lists and panels usually run to the edge).
+ */
+export function padRegions<R extends { x: number; y: number; w: number; h: number }>(regions: R[], pad = 0.03, snap = 0.15): R[] {
+  return regions.map((r) => {
+    let x1 = Math.max(0, r.x - pad);
+    let y1 = Math.max(0, r.y - pad);
+    let x2 = Math.min(1, r.x + r.w + pad);
+    let y2 = Math.min(1, r.y + r.h + pad);
+    if (x1 < snap) x1 = 0;
+    if (y1 < snap) y1 = 0;
+    if (x2 > 1 - snap) x2 = 1;
+    if (y2 > 1 - snap) y2 = 1;
+    return { ...r, x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  });
+}
+
+export interface Span {
+  start: number;
+  duration: number;
+}
+
+/** Read ffmpeg freezedetect output into still stretches; a freeze still running at the end closes at `duration`. */
+export function parseFreezes(log: string, duration: number): Span[] {
+  const spans: Span[] = [];
+  let open: number | null = null;
+  for (const line of log.split("\n")) {
+    const start = line.match(/freeze_start:\s*([\d.]+)/);
+    const end = line.match(/freeze_end:\s*([\d.]+)/);
+    if (start) open = Number(start[1]);
+    if (end && open !== null) {
+      spans.push({ start: open, duration: Number(end[1]) - open });
+      open = null;
+    }
+  }
+  if (open !== null && duration > open) spans.push({ start: open, duration: duration - open });
+  return spans.map((s) => ({ start: Math.round(s.start * 100) / 100, duration: Math.round(s.duration * 100) / 100 })).filter((s) => s.duration > 0);
+}
+
+/** Stretches of at least `min` seconds where nothing on screen changes (dead time). */
+export async function idleSpans(input: string, duration: number, min = 1.2): Promise<Span[]> {
+  const { stderr } = await run(
+    "ffmpeg",
+    ["-hide_banner", "-v", "info", "-i", input, "-map", "0:v:0", "-vf", `freezedetect=n=0.003:d=${min}`, "-f", "null", "-"],
+    { maxBuffer: MAX_BUFFER },
+  );
+  return parseFreezes(stderr, duration);
+}
+
 /** Re-save an image as an RGB PNG with no alpha channel (App Store Connect rejects transparency). */
 export async function flattenPng(input: string, output: string): Promise<void> {
   await run("ffmpeg", ["-y", "-v", "error", "-i", input, "-frames:v", "1", "-pix_fmt", "rgb24", output], { maxBuffer: MAX_BUFFER });
