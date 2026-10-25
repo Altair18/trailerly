@@ -1,4 +1,4 @@
-import { additionalFiles, aptGet, ffmpeg } from "@trigger.dev/build/extensions/core";
+import { additionalFiles, additionalPackages, aptGet, ffmpeg } from "@trigger.dev/build/extensions/core";
 import { defineConfig } from "@trigger.dev/sdk";
 
 export default defineConfig({
@@ -27,6 +27,9 @@ export default defineConfig({
       additionalFiles({
         files: ["./src/remotion/**", "./src/lib/specs/**", "./src/lib/timeline/**"],
       }),
+      // No task imports react-dom, so marking it external alone doesn't install it,
+      // but the Remotion bundle needs it at render time.
+      additionalPackages({ packages: ["react-dom@19.3.1"] }),
     ],
     external: [
       "@remotion/renderer",
