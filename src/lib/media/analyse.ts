@@ -7,14 +7,17 @@ For every clip give:
 - label: 2 to 5 words saying what happens, e.g. "Asks a question", "Attaches a photo".
 - feature: which of the app's features (from the list) the clip shows, or null.
 - interest: 1 to 5. 1 = loading, blank, idle, settings or menus. 5 = the app's core value clearly on screen.
-- personal_info: true if the frames show real personal data that is not the app's own demo content:
-  people's names, email addresses, phone numbers, real message or chat titles, notifications, faces of private people.
+- personal_info: true if the frames show real personal data or real private content rather than demo content made
+  for the video: people's names, email addresses, phone numbers, notifications, faces of private people, and the
+  user's own real material, such as their chat titles, messages or AI replies about their own work, documents,
+  project or file names. When unsure whether content is demo content, treat it as personal.
 - privacy_note: one short phrase saying what and where, or null.
 - private_regions: when personal_info is true, rectangles covering all of it in every frame of that clip, as fractions
   of the frame: {"x": left, "y": top, "w": width, "h": height}, each 0 to 1. Be generous (cover whole lists or
   panels, not single words) and merge overlapping areas. Empty list when personal_info is false.
+- shot: when a shot list is given, the number of the shot this clip films (1-based), or null if none fits.
 Return JSON: {"clips": [{"clip_id": "...", "label": "...", "feature": ... , "interest": n, "personal_info": bool,
-"privacy_note": ..., "private_regions": [...]}]}.`;
+"privacy_note": ..., "private_regions": [...], "shot": n or null}]}.`;
 
 export const ClipNotesReply = z.object({
   clips: z.array(ClipNotes.extend({ clip_id: z.string() })),
@@ -36,13 +39,18 @@ export async function analyseClips(
   clips: ClipFrames[],
   features: string[],
   vision: Vision,
+  shots?: string[],
 ): Promise<Record<string, ClipNotes>> {
   const images = clips.flatMap((c) =>
     c.frames.map((data, i) => ({ data, label: i === 0 ? `Clip ${c.clipId}:` : undefined })),
   );
   const reply = await vision({
     system: ANALYSE_SYSTEM,
-    prompt: JSON.stringify({ app_features: features, clip_ids: clips.map((c) => c.clipId) }),
+    prompt: JSON.stringify({
+      app_features: features,
+      clip_ids: clips.map((c) => c.clipId),
+      shot_list: shots?.length ? shots.map((action, i) => ({ shot: i + 1, action })) : undefined,
+    }),
     images,
   });
   return Object.fromEntries(reply.clips.map(({ clip_id, ...notes }) => [clip_id, notes]));

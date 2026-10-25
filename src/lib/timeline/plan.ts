@@ -14,7 +14,7 @@ export interface PlanContext {
   brief: Brief;
   headline: string | null;
   socialHook?: string | null;
-  clips: Pick<Clip, "id" | "duration" | "notes">[];
+  clips: Pick<Clip, "id" | "duration" | "notes" | "idle">[];
   /** App Store screenshots, for when footage is missing, short or private. */
   screenshots?: Pick<Screenshot, "id" | "notes">[];
 }
@@ -36,6 +36,7 @@ concrete ("Snap a photo, get an answer"), in the brief's tone. Each line stays u
 
 Clips: each comes with a label, the feature it shows and an interest score (1 to 5). Use the highest-interest clips,
 match captions to what the clip shows, and you may use part of a clip (clip_offset + duration) to skip slow bits.
+A clip's dead_time lists stretches where nothing moves on screen ({start, duration} in seconds): leave them out.
 Never use a clip marked personal_info unless there is no other way to reach the minimum length.
 
 Screenshots: still App Store screenshots, animated for you. Use them (2 to 4 s each, with a caption) only when the
@@ -65,6 +66,7 @@ export function plannerPrompt(spec: OutputSpec, ctx: PlanContext, feedback: stri
       feature: c.notes?.feature ?? undefined,
       interest: c.notes?.interest,
       personal_info: isPrivate(c.notes) || undefined,
+      dead_time: c.idle?.length ? c.idle : undefined,
     })),
     screenshots: ctx.screenshots?.length
       ? ctx.screenshots.map((s) => ({ image_id: s.id, shows: s.notes?.label, feature: s.notes?.feature ?? undefined, interest: s.notes?.interest }))

@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
 import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
-import { blurRegions, chromeCrop, cutClip, frameAt, normalise, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
+import { blurRegions, chromeCrop, cutClip, frameAt, idleSpans, normalise, padRegions, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
 import { generateJson } from "@/lib/llm/claude";
 import { Brief } from "@/lib/schemas/brief";
+import { ShotList } from "@/lib/schemas/shotlist";
 import type { Clip } from "@/lib/schemas/clips";
 import { downloadTo, paths, uploadFile } from "@/lib/storage";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -41,6 +42,7 @@ export const prepareRecording = task({
       }
 
       const ranges = planClips(duration, await sceneChanges(norm));
+      const version = `${sourceId.slice(0, 8)}-${Date.now().toString(36)}`;
       const clips: Clip[] = [];
       const frames: ClipFrames[] = [];
       for (const [i, r] of ranges.entries()) {
@@ -49,21 +51,32 @@ export const prepareRecording = task({
         const posterFile = join(dir, `clip-${n}.jpg`);
         await cutClip(norm, clipFile, r.start, r.duration);
         await poster(clipFile, posterFile, Math.min(0.5, r.duration / 2));
-        await uploadFile(paths.clip(packId, n), clipFile, "video/mp4");
-        await uploadFile(paths.poster(packId, n), posterFile, "image/jpeg");
-        clips.push({ id: `clip_${n}`, ...r, path: paths.clip(packId, n), poster_path: paths.poster(packId, n) });
+        await uploadFile(paths.clip(packId, version, n), clipFile, "video/mp4");
+        await uploadFile(paths.poster(packId, version, n), posterFile, "image/jpeg");
+        const clip: Clip = { id: `clip_${n}`, ...r, path: paths.clip(packId, version, n), poster_path: paths.poster(packId, version, n) };
+        try {
+          const idle = await idleSpans(clipFile, r.duration);
+          if (idle.length) clip.idle = idle;
+        } catch (err) {
+          logger.warn("Dead-time check failed", { packId, clip: clip.id, error: (err as Error).message });
+        }
+        clips.push(clip);
         frames.push({ clipId: `clip_${n}`, frames: await sampleFrames(clipFile, dir, n, r.duration) });
       }
 
       // Best-effort: a clip without notes still works, the planner just knows less about it.
       try {
-        const { data: pack } = await db.from("packs").select("brief_json").eq("id", packId).single();
+        const { data: pack } = await db.from("packs").select("brief_json, shot_list_json").eq("id", packId).single();
         const brief = Brief.safeParse(pack?.brief_json);
-        const notes = await analyseClips(frames, brief.success ? brief.data.features : [], (opts) =>
-          generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 2048 }),
+        const shotList = ShotList.safeParse(pack?.shot_list_json);
+        const notes = await analyseClips(
+          frames,
+          brief.success ? brief.data.features : [],
+          (opts) => generateJson({ ...opts, schema: ClipNotesReply, maxTokens: 4096, effort: "medium" }),
+          shotList.success ? shotList.data.shots.map((s) => s.action) : undefined,
         );
         for (const clip of clips) if (notes[clip.id]) clip.notes = notes[clip.id];
-        await blurPrivateClips(clips, dir, packId, await probe(norm));
+        await blurPrivateClips(clips, dir, packId, version, await probe(norm));
       } catch (err) {
         logger.warn("Clip check failed; continuing without notes", { packId, error: (err as Error).message });
       }
@@ -98,9 +111,9 @@ const MAX_BLUR_SHARE = 0.45;
  * Blur the regions Claude marked in each private clip, re-upload the clip and its poster,
  * and mark it blurred. Mostly-blurred clips also lose interest so the planner prefers others.
  */
-async function blurPrivateClips(clips: Clip[], dir: string, packId: string, size: { width: number; height: number }) {
+async function blurPrivateClips(clips: Clip[], dir: string, packId: string, version: string, size: { width: number; height: number }) {
   for (const [i, clip] of clips.entries()) {
-    const regions = clip.notes?.personal_info ? clip.notes.private_regions ?? [] : [];
+    const regions = clip.notes?.personal_info ? padRegions(clip.notes.private_regions ?? []) : [];
     const rects = toPixels(regions, size.width, size.height);
     if (!clip.notes || rects.length === 0) continue;
     const n = i + 1;
@@ -109,6 +122,9 @@ async function blurPrivateClips(clips: Clip[], dir: string, packId: string, size
     const posterFile = join(dir, `clip-${n}-blur.jpg`);
     await blurRegions(src, out, rects);
     await poster(out, posterFile, Math.min(0.5, clip.duration / 2));
+    // New names, so nothing can pick up the unblurred files from a cache.
+    clip.path = paths.clip(packId, version, n, "-blurred");
+    clip.poster_path = paths.poster(packId, version, n, "-blurred");
     await uploadFile(clip.path, out, "video/mp4");
     await uploadFile(clip.poster_path, posterFile, "image/jpeg");
     const share = rects.reduce((a, r) => a + r.w * r.h, 0) / (size.width * size.height);

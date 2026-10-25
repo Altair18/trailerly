@@ -6,6 +6,8 @@ import { PageHead } from "@/components/AppLine";
 import { TopBar } from "@/components/TopBar";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS } from "@/lib/media/clips";
 import { accent } from "@/lib/palette";
+import { idleSeconds, isPrivate } from "@/lib/schemas/clips";
+import { ShotListPanel } from "./ShotListPanel";
 import { type PackState, usePack } from "../usePack";
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
@@ -37,7 +39,8 @@ function put(url: string, file: File, onProgress: (pct: number) => void): Promis
   });
 }
 
-const busy = (p: PackState) => p.recording?.status === "preparing" || p.recording?.status === "uploading";
+const writingShots = (p: PackState) => !p.shot_list_json && (p.stage === "ingesting" || p.stage === "writing_brief" || p.stage === "writing_hooks");
+const busy = (p: PackState) => p.recording?.status === "preparing" || p.recording?.status === "uploading" || writingShots(p);
 
 export function RecordingUpload({ packId }: { packId: string }) {
   const { pack, error: loadError, reload } = usePack(packId, busy);
@@ -88,6 +91,10 @@ export function RecordingUpload({ packId }: { packId: string }) {
         <PageHead app={pack?.app ?? null} step={2} title="Add a screen recording">
           {MIN_RECORDING_SECONDS} to {MAX_RECORDING_SECONDS} seconds of the app in use. Every video in your pack is cut from this one file.
         </PageHead>
+
+        {pack && (state === "empty" || state === "done" || rec?.status === "error") && (
+          <ShotListPanel list={pack.shot_list_json} writing={writingShots(pack)} clips={state === "done" && rec ? rec.clips : null} />
+        )}
 
         {(state === "empty" || rec?.status === "error") && (
           <Dropzone onFile={upload} error={error ?? (rec?.status === "error" ? rec.error : null)} />
@@ -144,8 +151,12 @@ export function RecordingUpload({ packId }: { packId: string }) {
                     <span className="num" style={{ background: accent(i) }}>{i + 1}</span>
                     <span className="dur mono">{fmt(c.duration)}</span>
                     {c.notes?.personal_info && (
-                      <span className="mono" title={c.notes.privacy_note ?? "Personal data"} style={{ position: "absolute", top: 8, right: 8, fontSize: 11, fontWeight: 700, padding: "3px 6px", borderRadius: 6, background: "var(--coral)", color: "var(--ink)" }}>
-                        PRIVATE
+                      <span
+                        className="mono"
+                        title={c.notes.blurred ? `Blurred: ${c.notes.privacy_note ?? "personal data"}` : c.notes.privacy_note ?? "Personal data"}
+                        style={{ position: "absolute", top: 8, right: 8, fontSize: 11, fontWeight: 700, padding: "3px 6px", borderRadius: 6, background: c.notes.blurred ? "var(--mint)" : "var(--coral)", color: "var(--ink)" }}
+                      >
+                        {c.notes.blurred ? "BLURRED" : "PRIVATE"}
                       </span>
                     )}
                   </div>
@@ -154,6 +165,11 @@ export function RecordingUpload({ packId }: { packId: string }) {
                       <b>{c.notes.label}</b>
                       <span className="mu" style={{ display: "block" }}>{"★".repeat(c.notes.interest)}{"☆".repeat(5 - c.notes.interest)}</span>
                     </figcaption>
+                  )}
+                  {idleSeconds(c) >= 1 && (
+                    <span className="mono" style={{ display: "block", fontSize: 11, marginTop: 4, color: "var(--yel)" }} title="Nothing moves on screen here; the edit skips it">
+                      {idleSeconds(c).toFixed(1)} s idle · skipped
+                    </span>
                   )}
                 </figure>
               ))}
@@ -169,9 +185,15 @@ export function RecordingUpload({ packId }: { packId: string }) {
                 <span>{fmt(rec.duration_s ?? 0)}</span>
               </div>
             </div>
-            {rec.clips.some((c) => c.notes?.personal_info) && (
+            {rec.clips.some((c) => c.notes?.blurred) && (
+              <div style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(46,230,166,.1)", border: "1px solid var(--mint)", fontSize: 14 }}>
+                <b>We blurred personal data</b> in {rec.clips.filter((c) => c.notes?.blurred).map((c) => c.id.replace("clip_", "clip ")).join(", ")}{" "}
+                ({rec.clips.filter((c) => c.notes?.blurred).map((c) => c.notes?.privacy_note).filter(Boolean).join("; ") || "personal data"}). Check the clips before you use them.
+              </div>
+            )}
+            {rec.clips.some((c) => isPrivate(c.notes)) && (
               <div role="alert" style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,90,78,.12)", border: "1px solid var(--coral)", fontSize: 14 }}>
-                <b>Some clips show personal data</b> ({rec.clips.filter((c) => c.notes?.personal_info).map((c) => c.notes?.privacy_note || c.id).join("; ")}).
+                <b>Some clips show personal data</b> ({rec.clips.filter((c) => isPrivate(c.notes)).map((c) => c.notes?.privacy_note || c.id).join("; ")}).
                 We&apos;ll leave them out where we can. For the cleanest result, record again with demo data and notifications off.
               </div>
             )}

@@ -23,6 +23,7 @@ export const writeBrief = task({
   run: async ({ packId, listing, reviews }: PackPayload & { listing: Listing; reviews: Review[] }) => {
     const draft = await generateJson({
       schema: BriefDraft,
+      tier: "smart",
       system: SYSTEM,
       prompt: JSON.stringify({
         listing: { name: listing.name, genre: listing.genre, description: listing.description },

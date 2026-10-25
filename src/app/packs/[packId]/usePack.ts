@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Brief } from "@/lib/schemas/brief";
 import type { ClipNotes } from "@/lib/schemas/clips";
 import type { ChosenHooks, Hook } from "@/lib/schemas/hooks";
+import type { ShotList } from "@/lib/schemas/shotlist";
 import type { OutputSpecId } from "@/lib/specs/outputs";
 import type { Timeline } from "@/lib/timeline/schema";
 import type { OutputStatus, PackStage, RuleResultValue, SourceStatus } from "@/types/db";
@@ -15,6 +16,7 @@ export interface PackState {
   brief_json: Brief | null;
   hooks_json: Hook[] | null;
   chosen_hooks: ChosenHooks | null;
+  shot_list_json: ShotList | null;
   app: { name: string; icon_url: string | null } | null;
   recording: {
     id: string;
@@ -22,7 +24,7 @@ export interface PackState {
     error: string | null;
     file_name: string | null;
     duration_s: number | null;
-    clips: Array<{ id: string; start: number; duration: number; url: string; poster: string; notes: ClipNotes | null }>;
+    clips: Array<{ id: string; start: number; duration: number; url: string; poster: string; notes: ClipNotes | null; idle: Array<{ start: number; duration: number }> }>;
   } | null;
   outputs: Array<{
     spec: OutputSpecId;
