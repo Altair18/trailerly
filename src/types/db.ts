@@ -9,6 +9,8 @@ export type PackStatus = "draft" | "paid" | "rendering" | "ready" | "failed";
 export type PackStage = "ingesting" | "writing_brief" | "writing_hooks" | "review" | "error";
 export type SourceKind = "recording" | "screenshot";
 export type RuleResultValue = "pass" | "warn" | "block";
+export type SourceStatus = "uploading" | "preparing" | "ready" | "error";
+export type OutputStatus = "queued" | "planning" | "rendering" | "ready" | "failed";
 
 type Table<Row, Required extends keyof Row> = {
   Row: Row;
@@ -29,10 +31,12 @@ export type PackRow = {
 };
 export type SourceRow = {
   id: string; pack_id: string; kind: SourceKind; url: string; duration_s: number | null; clips_json: Json | null;
+  status: SourceStatus; error: string | null; file_name: string | null; created_at: string;
 };
 export type OutputRow = {
   id: string; pack_id: string; spec: OutputSpecId; timeline_json: Json | null;
   draft_url: string | null; final_url: string | null; rules_status: RuleResultValue | null;
+  status: OutputStatus; error: string | null; updated_at: string;
 };
 export type SceneRow = {
   id: string; output_id: string; prompt: string; prompt_hash: string; model: string | null;
@@ -66,6 +70,8 @@ export type Database = {
       source_kind: SourceKind;
       output_spec: OutputSpecId;
       rule_result: RuleResultValue;
+      source_status: SourceStatus;
+      output_status: OutputStatus;
     };
     CompositeTypes: { [_ in never]: never };
   };

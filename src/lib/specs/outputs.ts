@@ -111,3 +111,6 @@ export const PACK_OUTPUTS = Object.keys(OUTPUT_SPECS) as OutputSpecId[];
 
 /** Drafts render at a third of full size. */
 export const DRAFT_SCALE = 1 / 3;
+
+/** Outputs the drafts run produces so far; grows with each milestone (M3: header + search, M5: social). */
+export const DRAFT_SPECS: OutputSpecId[] = ["preview"];

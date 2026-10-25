@@ -4,11 +4,10 @@ import { ingestListing } from "./01-ingest-listing";
 import { writeBrief } from "./03-write-brief";
 import { writeHooks } from "./04-write-hooks";
 import { planTimelines } from "./05-plan-timelines";
-import { generateScenes } from "./06-generate-scenes";
-import { voiceCaptions } from "./07-voice-captions";
 import { compose } from "./08-compose";
 import { checkRules } from "./09-check-rules";
 import { packagePack } from "./10-package";
+import { DRAFT_SPECS } from "@/lib/specs/outputs";
 import type { PackPayload } from "./payload";
 
 // The pipeline pauses for the user twice (edit brief + pick hooks, then pay),
@@ -33,16 +32,16 @@ export const preparePack = task({
   },
 });
 
-/** Brief approved and hooks picked -> watermarked drafts with rule results. */
+/** Brief approved, hooks picked, recording ready -> watermarked drafts with rule results. */
 export const renderDrafts = task({
   id: "render-drafts",
+  retry: { maxAttempts: 1 },
   run: async ({ packId }: PackPayload) => {
-    // TODO(M2): load brief, chosen hooks and clips from the database as planner context.
-    const { timelines } = await planTimelines.triggerAndWait({ packId, context: {} }).unwrap();
-    await generateScenes.triggerAndWait({ packId }).unwrap();
-    await voiceCaptions.triggerAndWait({ packId }).unwrap();
-    await compose.triggerAndWait({ packId, final: false }).unwrap();
-    return checkRules.triggerAndWait({ packId, timelines }).unwrap();
+    const specs = DRAFT_SPECS;
+    await planTimelines.triggerAndWait({ packId, specs }).unwrap();
+    // generateScenes (M3) and voiceCaptions (M5) join here once their outputs are in DRAFT_SPECS.
+    await compose.triggerAndWait({ packId, specs, final: false }).unwrap();
+    return checkRules.triggerAndWait({ packId, specs }).unwrap();
   },
 });
 
@@ -50,7 +49,7 @@ export const renderDrafts = task({
 export const renderFinal = task({
   id: "render-final",
   run: async ({ packId }: PackPayload) => {
-    await compose.triggerAndWait({ packId, final: true }).unwrap();
+    await compose.triggerAndWait({ packId, specs: DRAFT_SPECS, final: true }).unwrap();
     return packagePack.triggerAndWait({ packId }).unwrap();
   },
 });
