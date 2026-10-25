@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cleanEnv } from "./clean-env";
 
 // Server-side env. Every key is optional at boot so the skeleton runs without
 // credentials; call requireEnv() at the point a service is actually used.
@@ -32,9 +33,11 @@ export type Env = z.infer<typeof serverSchema>;
 let cached: Env | undefined;
 
 export function env(): Env {
-  // Treat empty strings from .env files as unset.
+  // Strip stray BOM/zero-width characters and whitespace; treat empty strings as unset.
   const raw = Object.fromEntries(
-    Object.entries(process.env).filter(([, v]) => v !== ""),
+    Object.entries(process.env)
+      .map(([k, v]) => [k, cleanEnv(v)] as const)
+      .filter(([, v]) => v !== undefined),
   );
   cached ??= serverSchema.parse(raw);
   return cached;
