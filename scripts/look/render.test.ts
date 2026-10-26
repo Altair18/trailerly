@@ -49,7 +49,6 @@ it("renders header and search", async () => {
         safeArea: spec.safeArea,
         brand: { name: "Sprout", iconUrl: "http://localhost:4557/icon.png", accent: await iconAccent(join(D, "icon.png")) },
         scale: SCALE,
-        clipFocus: Object.fromEntries(clips.map((c: { id: string; focus?: unknown }) => [c.id, c.focus ?? []])),
       },
     });
   }

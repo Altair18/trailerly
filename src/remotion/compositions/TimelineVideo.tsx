@@ -1,7 +1,6 @@
 import { AbsoluteFill, Easing, Img, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
-import { focusFor, type FocusPoint } from "@/lib/timeline/focus";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
 import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Media, type SafeArea, type SceneShot } from "./Landscape";
@@ -26,15 +25,13 @@ export interface TimelineVideoProps extends Record<string, unknown> {
   imageUrls?: Record<string, string>;
   /** Header and search: the centred box every device crop keeps (fractions of the frame). */
   safeArea?: SafeArea;
-  /** clip_id -> where things change on screen over the clip; header and search lean in on it. */
-  clipFocus?: Record<string, FocusPoint[]>;
 }
 
 /** Frames of the crossfade from the end of a looping video back to its first shot. */
 const LOOP_FADE = 15;
 
 
-export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea, clipFocus }: TimelineVideoProps) {
+export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea }: TimelineVideoProps) {
   useBrandFonts();
   const { fps, width, durationInFrames } = useVideoConfig();
   const landscape = baseWidth > baseHeight;
@@ -50,7 +47,7 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
       <div style={{ position: "absolute", left: 0, top: 0, width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: "top left", overflow: "hidden" }}>
         {landscape ? (
           <>
-            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps, clipFocus)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
+            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
             {base.map((seg, i) =>
               seg.type === "text" || seg.type === "end_card" ? (
                 <Sequence key={`c${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
@@ -100,13 +97,7 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
 
 
 /** The landscape stage's shots: every screen or screenshot segment that has media, in order. */
-function sceneShots(
-  base: Segment[],
-  clipUrls: Record<string, string>,
-  imageUrls: Record<string, string>,
-  fps: number,
-  clipFocus: Record<string, FocusPoint[]> = {},
-): SceneShot[] {
+function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls: Record<string, string>, fps: number): SceneShot[] {
   const shots: SceneShot[] = [];
   for (const seg of base) {
     const src = seg.clip_id ? clipUrls[seg.clip_id] : undefined;
@@ -117,8 +108,7 @@ function sceneShots(
         : seg.type === "screenshot" && image
           ? { kind: "image", src: image }
           : null;
-    const focus = seg.type === "screen" && seg.clip_id ? focusFor(clipFocus[seg.clip_id], seg.clip_offset ?? 0, seg.duration) : null;
-    if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)), focus });
+    if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)) });
   }
   return shots;
 }
@@ -247,7 +237,6 @@ function HookOverlay({ text, width }: { text: string; width: number }) {
   );
 }
 
-/** What's on screen: a short line in a dark pill in the lower third. */
 /**
  * A caption in the lower third: plain bold words rising in over a soft shadow, no box. A boxed caption
  * sliding up looked like an iOS notification banner landing on the screen.

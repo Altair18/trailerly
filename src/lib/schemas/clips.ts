@@ -42,8 +42,6 @@ export const Clip = z.object({
   notes: ClipNotes.optional(),
   /** Stretches where nothing moves on screen (seconds from the clip's start); the editor skips them. */
   idle: z.array(z.object({ start: z.number(), duration: z.number() })).optional(),
-  /** Where things change on screen, a few times a second (fractions of the frame); the landscape cut zooms there. */
-  focus: z.array(z.object({ t: z.number(), x: z.number(), y: z.number(), amount: z.number() })).optional(),
 });
 export type Clip = z.infer<typeof Clip>;
 export const Clips = z.array(Clip);

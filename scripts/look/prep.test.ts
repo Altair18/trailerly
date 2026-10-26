@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { it } from "vitest";
 import { planClips } from "@/lib/media/clips";
 import { chromeCrop, cutClip, idleSpans, normalise, probe, sceneChanges } from "@/lib/media/ffmpeg";
-import { clipFocus } from "@/lib/media/focus";
 
 const D = process.env.DEMO_DIR!;
 it("prepares clips", async () => {
@@ -16,8 +15,8 @@ it("prepares clips", async () => {
   for (const [i, r] of ranges.entries()) {
     const file = join(D, `clip_${i + 1}.mp4`);
     await cutClip(join(D, "norm.mp4"), file, r.start, r.duration);
-    clips.push({ id: `clip_${i + 1}`, start: r.start, duration: r.duration, idle: await idleSpans(file, r.duration), focus: await clipFocus(file) });
+    clips.push({ id: `clip_${i + 1}`, start: r.start, duration: r.duration, idle: await idleSpans(file, r.duration) });
   }
-  console.log({ size: [n.width, n.height], cuts });
+  console.log({ size: [n.width, n.height], cuts, clips: JSON.stringify(clips) });
   writeFileSync(join(D, "clips.json"), JSON.stringify(clips, null, 1));
 });

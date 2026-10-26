@@ -128,22 +128,6 @@ export interface SceneShot {
   /** Frames from the start of the video. */
   from: number;
   frames: number;
-  /** Where the action is on the screen (fractions); the hero screen leans in on it. */
-  focus?: { x: number; y: number } | null;
-}
-
-/** How far the hero screen leans in on the action: gently under the hook, more on the beats after it. */
-const ZOOM_FIRST = 1.18;
-const ZOOM = 1.4;
-/** Shots shorter than this play unzoomed: a zoom needs time to land and read. */
-const ZOOM_MIN_FRAMES = 60;
-
-/** Scale over a shot: ease in on the action after the shot settles, hold, and ease back out before the cut. */
-export function zoomAt(frame: number, frames: number, peak: number): number {
-  if (frames < ZOOM_MIN_FRAMES || peak <= 1) return 1;
-  const inT = interpolate(frame, [10, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) });
-  const outT = interpolate(frame, [frames - 16, frames - 2], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) });
-  return 1 + (peak - 1) * Math.min(inT, outT);
 }
 
 /** Frames of the hero screen's crossfade from one shot to the next. */
@@ -152,19 +136,14 @@ const SWAP = 9;
 const GLARE = 16;
 
 /** The hero phone's screen for one shot: settles in over the previous one with a sweep of light (the first shot just shows). */
-function HeroScreen({ media, first, focus, frames }: { media: Media; first: boolean; focus?: { x: number; y: number } | null; frames: number }) {
+function HeroScreen({ media, first }: { media: Media; first: boolean }) {
   const frame = useCurrentFrame();
-  const zoom = focus ? zoomAt(frame, frames, first ? ZOOM_FIRST : ZOOM) : 1;
-  // Zooming about the action keeps that spot where it is and every edge of the screen covered.
-  const origin = focus ? `${Math.round(Math.min(0.9, Math.max(0.1, focus.x)) * 100)}% ${Math.round(Math.min(0.9, Math.max(0.1, focus.y)) * 100)}%` : "50% 50%";
   const t = first ? 1 : interpolate(frame, [0, SWAP], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   const g = interpolate(frame, [0, GLARE], [-0.6, 1.6], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
   return (
     <AbsoluteFill>
       <AbsoluteFill style={{ opacity: t, transform: `scale(${1.05 - 0.05 * t})` }}>
-        <AbsoluteFill style={{ transform: `scale(${zoom})`, transformOrigin: origin }}>
-          <MediaFill media={media} style={FILL} />
-        </AbsoluteFill>
+        <MediaFill media={media} style={FILL} />
       </AbsoluteFill>
       {!first && frame < GLARE && (
         <AbsoluteFill
@@ -275,8 +254,9 @@ export function LandscapeScene({
           style={{ transform: `rotateY(${-9 + sway * 2.5}deg) rotateX(${2 + lift}deg)`, transformOrigin: "50% 50%" }}
         >
           {shots.map((s, i) => (
-            <Sequence key={`h${i}`} from={s.from} durationInFrames={s.frames}>
-              <HeroScreen media={s.media} first={i === 0} focus={s.focus} frames={s.frames} />
+            // Each screen stays up under the next one's crossfade, so a cut never dips through black.
+            <Sequence key={`h${i}`} from={s.from} durationInFrames={s.frames + (i < shots.length - 1 ? SWAP : 0)}>
+              <HeroScreen media={s.media} first={i === 0} />
             </Sequence>
           ))}
           {loop && shots.length > 1 && durationInFrames > 60 && (

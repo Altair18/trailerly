@@ -2,7 +2,6 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
-import { clipFocus } from "@/lib/media/focus";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
 import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
 import { blurRegions, chromeCrop, coveredShare, cutClip, frameAt, idleSpans, normalise, padRegions, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
@@ -60,11 +59,6 @@ export const prepareRecording = task({
           if (idle.length) clip.idle = idle;
         } catch (err) {
           logger.warn("Dead-time check failed", { packId, clip: clip.id, error: (err as Error).message });
-        }
-        try {
-          clip.focus = await clipFocus(clipFile);
-        } catch (err) {
-          logger.warn("Focus check failed; this clip plays unzoomed", { packId, clip: clip.id, error: (err as Error).message });
         }
         clips.push(clip);
         frames.push({ clipId: `clip_${n}`, frames: await sampleFrames(clipFile, dir, n, r.duration) });
