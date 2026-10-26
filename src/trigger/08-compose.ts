@@ -31,13 +31,14 @@ export function errorText(err: unknown): string {
 
 /**
  * Stage 8: render each output's Remotion composition from its timeline JSON.
- * Drafts: one third size + watermark. Finals (after payment): upscale AI clips first.
+ * Drafts: one third size + watermark, and the output's status tracks the render.
+ * Finals (after payment): full size, no watermark, from the same timeline the user approved. A final never touches
+ * the draft's status or file, so the drafts page keeps playing while the finals render.
  */
 export const compose = task({
   id: "compose",
   machine: "large-1x",
   run: async ({ packId, specs, final }: FinalPayload & { specs: OutputSpecId[] }) => {
-    if (final) throw new Error("Final renders arrive with payment (M6).");
     const db = supabaseAdmin();
     const { app } = await loadPackWithApp(packId);
     // The landscape stage lights itself in the app's own colour, read from its icon.
@@ -56,7 +57,7 @@ export const compose = task({
         const spec = OUTPUT_SPECS[id];
         const { data: output, error } = await db.from("outputs").select("*").eq("pack_id", packId).eq("spec", id).single();
         if (error) throw error;
-        await db.from("outputs").update({ status: "rendering", error: null }).eq("id", output.id);
+        if (!final) await db.from("outputs").update({ status: "rendering", error: null }).eq("id", output.id);
         try {
           const file = join(dir, `${id}.mp4`);
           const timeline = Timeline.parse(output.timeline_json);
@@ -64,22 +65,23 @@ export const compose = task({
             timeline,
             clipUrls,
             imageUrls,
-            watermark: true,
+            watermark: !final,
             loop: spec.loop,
             baseWidth: spec.width,
             baseHeight: spec.height,
             safeArea: spec.safeArea,
             brand,
-            scale: DRAFT_SCALE,
+            scale: final ? 1 : DRAFT_SCALE,
           };
           await renderOutput({
             spec: id,
             outFile: file,
             props,
-            onProgress: (p) => metadata.set(`progress.${id}`, Math.round(p * 100)),
+            silentAudio: final,
+            onProgress: (p) => metadata.set(`${final ? "final" : "progress"}.${id}`, Math.round(p * 100)),
           });
           // Pacing checks on header and search: logged so slow or crowded cuts show up in run logs, never blocking.
-          if (isLandscape(spec)) {
+          if (!final && isLandscape(spec)) {
             const issues = lintLandscapeTimeline(timeline);
             if (issues.length) logger.warn("Render lint", { packId, spec: id, issues });
           }
@@ -93,29 +95,35 @@ export const compose = task({
                 frame: Math.round(stillSecond(timeline) * spec.fps),
                 outFile: png,
               });
-              await uploadFile(paths.draftStill(packId, still.id), png, "image/png");
+              await uploadFile(final ? paths.final(packId, still.fileName) : paths.draftStill(packId, still.id), png, "image/png");
             } catch (err) {
               logger.warn("Still failed; the video is still fine", { packId, still: still.id, error: (err as Error).message });
             }
           }
-          await uploadFile(paths.draft(packId, id), file, "video/mp4");
-          await db
-            .from("outputs")
-            .update({ status: "ready", draft_url: paths.draft(packId, id), updated_at: new Date().toISOString() })
-            .eq("id", output.id);
-          logger.info("Draft rendered", { packId, spec: id });
+          if (final) {
+            await uploadFile(paths.final(packId, spec.fileName), file, "video/mp4");
+            await db.from("outputs").update({ final_url: paths.final(packId, spec.fileName) }).eq("id", output.id);
+            logger.info("Final rendered", { packId, spec: id });
+          } else {
+            await uploadFile(paths.draft(packId, id), file, "video/mp4");
+            await db
+              .from("outputs")
+              .update({ status: "ready", draft_url: paths.draft(packId, id), updated_at: new Date().toISOString() })
+              .eq("id", output.id);
+            logger.info("Draft rendered", { packId, spec: id });
+          }
           rendered.push(id);
         } catch (err) {
           // One output failing (say the header) shouldn't stop the others; the drafts page offers a retry.
-          await db.from("outputs").update({ status: "failed", error: errorText(err) }).eq("id", output.id);
-          logger.error("Draft failed", { packId, spec: id, error: errorText(err) });
+          if (!final) await db.from("outputs").update({ status: "failed", error: errorText(err) }).eq("id", output.id);
+          logger.error(final ? "Final failed" : "Draft failed", { packId, spec: id, error: errorText(err) });
           failed.push(id);
         }
       }
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-    if (rendered.length === 0) throw new Error(`No drafts rendered (${failed.join(", ")} failed).`);
+    if (rendered.length === 0) throw new Error(`No ${final ? "finals" : "drafts"} rendered (${failed.join(", ")} failed).`);
     return { rendered, failed };
   },
 });

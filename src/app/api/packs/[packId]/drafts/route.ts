@@ -16,6 +16,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ packId
   const pack = await ownedPack((await params).packId);
   if (!pack) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (pack.stage !== "review") return NextResponse.json({ error: "The brief isn't ready yet." }, { status: 409 });
+  // Paid drafts are what the finals are cut from, so they stay as they were bought.
+  if (pack.status !== "draft") return NextResponse.json({ error: "This pack is paid for, so its drafts are locked." }, { status: 409 });
 
   const chosen = ChosenHooks.safeParse(pack.chosen_hooks);
   if (!chosen.success || !chosen.data.headline) {

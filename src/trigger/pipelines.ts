@@ -10,7 +10,10 @@ import { planTimelines } from "./05-plan-timelines";
 import { compose } from "./08-compose";
 import { checkRules } from "./09-check-rules";
 import { packagePack } from "./10-package";
-import { DRAFT_SPECS, draftSpecsFor } from "@/lib/specs/outputs";
+import { finalStatus } from "@/lib/payment";
+import { draftSpecsFor } from "@/lib/specs/outputs";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { PackStatus } from "@/types/db";
 import type { PackPayload } from "./payload";
 
 // The pipeline pauses for the user twice (edit brief + pick hooks, then pay),
@@ -53,11 +56,26 @@ export const renderDrafts = task({
   },
 });
 
-/** Paid -> full-resolution renders and the zip. Triggered by the Stripe webhook. */
+/** Paid -> full-resolution renders of exactly the drafts the user saw. Triggered by the Stripe webhook. */
 export const renderFinal = task({
   id: "render-final",
+  retry: { maxAttempts: 1 },
   run: async ({ packId }: PackPayload) => {
-    await compose.triggerAndWait({ packId, specs: DRAFT_SPECS, final: true }).unwrap();
-    return packagePack.triggerAndWait({ packId }).unwrap();
+    const { pack } = await loadPackWithApp(packId);
+    const chosen = ChosenHooks.parse(pack.chosen_hooks ?? { social: [], headline: null });
+    const specs = draftSpecsFor(variantHooks(chosen, (pack.hooks_json ?? []) as Hook[]));
+    await setPackStatus(packId, "rendering");
+    const { rendered, failed } = await compose.triggerAndWait({ packId, specs, final: true }).unwrap();
+    await packagePack.triggerAndWait({ packId });
+    await setPackStatus(packId, finalStatus(specs, rendered));
+    return { rendered, failed };
+  },
+  onFailure: async ({ payload }) => {
+    await setPackStatus(payload.packId, "failed");
   },
 });
+
+async function setPackStatus(packId: string, status: PackStatus) {
+  const { error } = await supabaseAdmin().from("packs").update({ status }).eq("id", packId);
+  if (error) logger.error("Pack status not saved", { packId, status, error: error.message });
+}
