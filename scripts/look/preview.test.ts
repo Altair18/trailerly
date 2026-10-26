@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { it } from "vitest";
 import { renderOutput } from "@/lib/render";
 import { iconAccent, iconStyle } from "@/lib/media/accent";
+import { soundtrackFor } from "@/lib/media/music";
 import type { Look } from "@/remotion/compositions/Landscape";
 import { OUTPUT_SPECS } from "@/lib/specs/outputs";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
@@ -68,7 +69,7 @@ it("renders the preview looks", async () => {
           baseHeight: spec.height,
           brand: { name: "Sprout", iconUrl: url("icon.png"), accent, style: await iconStyle(join(D, "icon.png"), process.env.GENRE) },
           scale: SCALE,
-          soundtrack: process.env.SOUND ? { bed: "music/zz-test-bed.mp3", whoosh: "music/zz-test-whoosh.mp3" } : undefined,
+          soundtrack: process.env.SOUND ? soundtrackFor(JSON.parse(readFileSync("public/music/manifest.json", "utf8")), process.env.GENRE, "demo") : undefined,
           look,
         },
       });
