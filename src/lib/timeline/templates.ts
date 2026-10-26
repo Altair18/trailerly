@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isPrivate, type Clip } from "@/lib/schemas/clips";
 import type { Screenshot } from "@/lib/media/screenshots";
 import { isLandscape, type OutputSpec } from "@/lib/specs/outputs";
+import { MAX_BEAT_SECONDS, MAX_OUTRO_SECONDS } from "./pacing";
 import { MAX_OVERLAY_CHARS, MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
 import { dropDangling, hookLine, shortLine } from "./preview";
 import type { Segment, Timeline } from "./schema";
@@ -38,6 +39,8 @@ const hook = (weight: number, note = "the strongest, busiest moment: the promise
 const close = (weight: number, note = "a calm, clear screen to sit under the app's name"): Beat => ({ role: "close", weight, caption: false, note });
 const beat = (role: BeatRole, weight: number, note: string): Beat => ({ role, weight, caption: true, note });
 
+// Landscape weights follow top apps' App Store videos: no beat over 5 s and a logo close of 2 s at the 12 s
+// header and 10 s search lengths (see render-lint).
 export const TEMPLATES: CutTemplate[] = [
   {
     id: "promise-tour",
@@ -92,28 +95,28 @@ export const TEMPLATES: CutTemplate[] = [
     name: "Single hero shot",
     shape: "landscape",
     idea: "One line held over the best moment, one caption beat, then the name.",
-    beats: [hook(5), beat("feature", 4.5, "the feature the hook promises"), close(2.5)],
+    beats: [hook(5), beat("feature", 5, "the feature the hook promises"), close(2)],
   },
   {
     id: "two-beat",
     name: "Two quick beats",
     shape: "landscape",
     idea: "Hook, then two short caption beats, then the name.",
-    beats: [hook(4), beat("feature", 3, "feature 1"), beat("feature", 3, "feature 2"), close(2.5)],
+    beats: [hook(4), beat("feature", 3, "feature 1"), beat("feature", 3, "feature 2"), close(2)],
   },
   {
     id: "calm-loop",
     name: "Calm loop",
     shape: "landscape",
     idea: "A long, readable hook over a calm screen and one payoff; ends where it can loop cleanly.",
-    beats: [hook(6, "a calm, readable screen in use"), beat("payoff", 4, "the result"), close(2.5, "a calm screen close to the opening one, so the loop is seamless")],
+    beats: [hook(5, "a calm, readable screen in use"), beat("payoff", 5, "the result"), close(2, "a calm screen close to the opening one, so the loop is seamless")],
   },
   {
     id: "quick-proof",
     name: "Result first",
     shape: "landscape",
     idea: "Hook, the result straight away, then how you get it.",
-    beats: [hook(3.5), beat("payoff", 4, "the result"), beat("feature", 3, "how you get it"), close(2.5)],
+    beats: [hook(3.5), beat("payoff", 3.5, "the result"), beat("feature", 3, "how you get it"), close(2)],
   },
 ];
 
@@ -217,7 +220,9 @@ export function buildFromTemplate(
     const isLastCard = b.role === "close" && useEndCard;
     if (!isLastCard && !clip && !shots.has(f.source)) errors.push(`Beat ${i + 1}: unknown clip or screenshot "${f.source}".`);
     if (!clip && shots.has(f.source) && !canScreenshot) errors.push(`Beat ${i + 1}: ${spec.label} can't use screenshots.`);
-    return { beat: b, source: f.source, clip, offset, available: isLastCard ? Infinity : available, want: (b.weight / weightSum) * total, least };
+    // Landscape beats never hold past the pacing limits; if the clips run short the video is a little shorter.
+    const cap = isLandscape(spec) ? (b.role === "close" ? MAX_OUTRO_SECONDS : MAX_BEAT_SECONDS) : Infinity;
+    return { beat: b, source: f.source, clip, offset, available: Math.min(isLastCard ? Infinity : available, Math.max(cap, least)), want: (b.weight / weightSum) * total, least };
   });
   if (errors.length) return { timeline: null, errors };
 

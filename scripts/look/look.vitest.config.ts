@@ -6,7 +6,7 @@ import { defineConfig } from "vitest/config";
 //   node scripts/look/record.cjs $OUT && ffmpeg -i $OUT/*.webm -r 30 -pix_fmt yuv420p $OUT/demo.mp4
 //   node scripts/look/icon.cjs $OUT
 //   DEMO_DIR=$OUT LOOK_FILE=scripts/look/prep.test.ts npx vitest run --config scripts/look/look.vitest.config.ts
-//   DEMO_DIR=$OUT LOOK_FILE=scripts/look/render.test.ts [ONLY=header] [SCALE=0.5] npx vitest run --config ...
+//   DEMO_DIR=$OUT LOOK_FILE=scripts/look/render.test.ts [ONLY=header] [SCALE=0.5] [LOOKS=studio,cinematic,bold] npx vitest run --config ...
 // Set REMOTION_BROWSER_EXECUTABLE to a local Chrome headless shell where Remotion can't download one.
 export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("../../src", import.meta.url)) } },

@@ -15,6 +15,7 @@ export const YEL = "#FFE135";
 export const PINK = "#FF2E88";
 export const DISPLAY = { fontFamily: "Archivo, sans-serif", fontStretch: "72%", fontWeight: 900, lineHeight: 0.95 } as const;
 export const UI = { fontFamily: "Geist, system-ui, sans-serif" } as const;
+export const SERIF = { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, lineHeight: 1.02 } as const;
 
 /** Frames for a segment's entrance (slide + fade) and the slow push-in across a screen segment. */
 export const ENTER_FRAMES = 8;
@@ -71,7 +72,22 @@ export function AppIcon({ brand, size }: { brand?: Brand; size: number }) {
 }
 
 /** Words rise into place one after another from behind a mask, the way title designers set lines. */
-export function RevealWords({ text, style, highlight = -1, accent, delay = 0 }: { text: string; style: CSSProperties; highlight?: number; accent?: string; delay?: number }) {
+export function RevealWords({
+  text,
+  style,
+  highlight = -1,
+  accent,
+  highlightStyle,
+  delay = 0,
+}: {
+  text: string;
+  style: CSSProperties;
+  highlight?: number;
+  accent?: string;
+  /** How the highlighted word differs, when not just by colour (e.g. set in italic). */
+  highlightStyle?: CSSProperties;
+  delay?: number;
+}) {
   const frame = useCurrentFrame();
   const words = text.split(/\s+/).filter(Boolean);
   return (
@@ -80,7 +96,16 @@ export function RevealWords({ text, style, highlight = -1, accent, delay = 0 }: 
         const t = interpolate(frame - delay - i * 3, [0, 13], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
         return (
           <span key={i} style={{ display: "inline-block", overflow: "hidden", paddingBottom: "0.1em", marginBottom: "-0.1em" }}>
-            <span style={{ display: "inline-block", transform: `translateY(${(1 - t) * 105}%)`, color: i === highlight && accent ? accent : undefined }}>{w}</span>
+            <span
+              style={{
+                display: "inline-block",
+                transform: `translateY(${(1 - t) * 105}%)`,
+                color: i === highlight && accent ? accent : undefined,
+                ...(i === highlight ? highlightStyle : undefined),
+              }}
+            >
+              {w}
+            </span>
           </span>
         );
       })}

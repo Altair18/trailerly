@@ -5,6 +5,7 @@ import { it } from "vitest";
 import { renderOutput } from "@/lib/render";
 import { iconAccent } from "@/lib/media/accent";
 import { lintLandscapeTimeline } from "@/lib/media/render-lint";
+import type { Look } from "@/remotion/compositions/Landscape";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { avoidDeadTime } from "@/lib/timeline/dead-time";
 import { buildFromTemplate, templateById, type TemplateFill } from "@/lib/timeline/templates";
@@ -12,6 +13,7 @@ import { buildFromTemplate, templateById, type TemplateFill } from "@/lib/timeli
 const D = process.env.DEMO_DIR!;
 const SCALE = Number(process.env.SCALE ?? 0.5);
 const ONLY = process.env.ONLY?.split(",");
+const LOOKS = (process.env.LOOKS ?? "cinematic").split(",") as Look[];
 const raw = JSON.parse(readFileSync(join(D, "clips.json"), "utf8"));
 const NOTES: Record<string, { label: string; interest: number; feature: string }> = {
   clip_1: { label: "Ticks off today's waterings", interest: 4, feature: "Watering reminders" },
@@ -37,21 +39,24 @@ it("renders header and search", async () => {
     if (!built.timeline) throw new Error(built.errors.join("\n"));
     const timeline = avoidDeadTime(built.timeline, clips);
     writeFileSync(join(D, `${id}.json`), JSON.stringify(timeline, null, 1));
-    await renderOutput({
-      spec: id,
-      outFile: join(D, `${id}.mp4`),
-      props: {
-        timeline,
-        clipUrls: Object.fromEntries(clips.map((c: { id: string }) => [c.id, `http://localhost:4557/${c.id}.mp4`])),
-        watermark: false,
-        loop: spec.loop,
-        baseWidth: spec.width,
-        baseHeight: spec.height,
-        safeArea: spec.safeArea,
-        brand: { name: "Sprout", iconUrl: "http://localhost:4557/icon.png", accent: await iconAccent(join(D, "icon.png")) },
-        scale: SCALE,
-      },
-    });
+    for (const look of LOOKS) {
+      await renderOutput({
+        spec: id,
+        outFile: join(D, LOOKS.length > 1 ? `${id}-${look}.mp4` : `${id}.mp4`),
+        props: {
+          timeline,
+          clipUrls: Object.fromEntries(clips.map((c: { id: string }) => [c.id, `http://localhost:4557/${c.id}.mp4`])),
+          watermark: false,
+          loop: spec.loop,
+          baseWidth: spec.width,
+          baseHeight: spec.height,
+          safeArea: spec.safeArea,
+          brand: { name: "Sprout", iconUrl: "http://localhost:4557/icon.png", accent: await iconAccent(join(D, "icon.png")) },
+          scale: SCALE,
+          look,
+        },
+      });
+    }
     console.log(id, "lint:", lintLandscapeTimeline(timeline));
   }
   server.close();

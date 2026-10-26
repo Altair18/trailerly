@@ -2,6 +2,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Span } from "@/lib/media/ffmpeg";
 import { isOverlay } from "@/lib/timeline/enforce";
+import { MAX_BEAT_SECONDS, MAX_OUTRO_SECONDS } from "@/lib/timeline/pacing";
+
+export { MAX_BEAT_SECONDS, MAX_OUTRO_SECONDS };
 import type { Timeline } from "@/lib/timeline/schema";
 
 const run = promisify(execFile);
@@ -10,10 +13,6 @@ const run = promisify(execFile);
 // short beats, one caption per beat, a short logo close, and no app screen that is mostly empty.
 // The timing rules report problems and never block a render; empty screens are kept out at the clip stage.
 
-/** Longest a single shot should hold before something changes. */
-export const MAX_BEAT_SECONDS = 5;
-/** Longest the closing logo should stay up. */
-export const MAX_OUTRO_SECONDS = 2;
 /** Share of the app screen that may be one flat colour before it reads as a broken screen. */
 export const MAX_BLANK_SHARE = 0.15;
 
