@@ -7,8 +7,9 @@ import { useEffect, useRef } from "react";
 //   swing and S-curve on their own;
 // - each foot stays planted on the page until the body pulls too far ahead, then steps, in diagonal pairs,
 //   with two-bone IK for the elbows and knees.
-// It dashes in from the side, freezes, looks around, licks, blinks, sways its tail, then runs off. Hover or
-// tap and it bolts. All drawing happens in one rAF loop writing SVG paths, so React never re-renders during
+// It dashes in from the side to the middle of the screen and hangs around there for half a minute or so:
+// short wanders, then long pauses to look around, lick, blink and sway its tail, before it leaves. Hover or
+// tap and it darts to another spot nearby, then settles again. All drawing happens in one rAF loop writing SVG paths, so React never re-renders during
 // a visit. Off with reduced motion. Add ?gecko to the URL to call it straight away.
 
 type V = { x: number; y: number };
@@ -157,18 +158,22 @@ export function Gecko() {
         const at = rest(k);
         return { pos: at, from: at, to: at, t: -1 };
       });
-      const reach = w < 640 ? r(70, 150) : r(110, Math.min(300, w * 0.24));
-      const p1 = { x: edge - sx * reach, y: y0 + r(-70, 70) };
-      const out: Step[] = [{ kind: "move", to: p1, speed: r(230, 300) }, { kind: "look", dur: r(2.4, 4) }];
-      let end = p1;
-      if (Math.random() < 0.6) {
-        end = { x: p1.x - sx * r(-40, 90), y: p1.y + r(-110, 110) };
-        out.push({ kind: "move", to: end, speed: r(200, 280) }, { kind: "look", dur: r(1.6, 3) });
+      // Head for the middle of the screen and hang around there: a few short wanders, each followed by a
+      // good long look around, before leaving by the nearest side.
+      const vh = window.innerHeight;
+      const mid = () => ({ x: w * r(0.32, 0.68), y: top + vh * r(0.35, 0.68) });
+      let at = mid();
+      const out: Step[] = [{ kind: "move", to: at, speed: r(240, 300) }, { kind: "look", dur: r(3, 5) }];
+      for (let k = 0, n = Math.floor(r(4, 7)); k < n; k++) {
+        const next = mid();
+        // Keep each wander short so it pads around rather than racing across.
+        const d = Math.hypot(next.x - at.x, next.y - at.y);
+        const lim = r(50, 140);
+        at = d > lim ? { x: at.x + ((next.x - at.x) / d) * lim, y: at.y + ((next.y - at.y) / d) * lim } : next;
+        out.push({ kind: "move", to: at, speed: r(160, 240) }, { kind: "look", dur: r(2.5, 5.5) });
       }
-      // Usually back out the way it came; sometimes a dash right across.
-      const across = Math.random() < 0.2;
-      const exitX = across ? w - edge - sx * 220 : edge + sx * 220;
-      out.push({ kind: "move", to: { x: exitX, y: end.y + r(-140, 140) }, speed: across ? 360 : 300 });
+      const exitLeft = at.x < w / 2;
+      out.push({ kind: "move", to: { x: exitLeft ? -220 : w + 220, y: at.y + r(-120, 120) }, speed: 300 });
       return out;
     }
 
@@ -391,7 +396,7 @@ export function Gecko() {
     function finish() {
       node!.style.display = "none";
       steps = [];
-      timer = window.setTimeout(visit, r(35000, 70000));
+      timer = window.setTimeout(visit, r(25000, 45000));
     }
 
     function visit() {
@@ -415,8 +420,15 @@ export function Gecko() {
     flee.current = () => {
       if (!steps.length || (steps[0]?.kind === "move" && steps[0].flee)) return;
       const w = W();
-      const toLeft = p[0]!.x < w / 2;
-      steps = [{ kind: "move", to: { x: toLeft ? -240 : w + 240, y: p[0]!.y + r(-120, 120) }, speed: 720, flee: true }];
+      // Startled, not scared off: a quick dart to another spot near the middle, a pause, then carry on.
+      const top = -layer!.getBoundingClientRect().top;
+      const vh = window.innerHeight;
+      let to = p[0]!;
+      for (let k = 0; k < 8 && Math.hypot(to.x - p[0]!.x, to.y - p[0]!.y) < 110; k++) {
+        to = { x: w * r(0.25, 0.75), y: top + vh * r(0.3, 0.72) };
+      }
+      const rest = steps.slice(1).filter((st) => st.kind === "look" || !st.flee);
+      steps = [{ kind: "move", to, speed: 640, flee: true }, { kind: "look", dur: r(2, 3.5) }, ...rest];
       dashing = true;
       flick = 0.9;
       lookLeft = 0;

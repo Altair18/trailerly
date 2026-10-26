@@ -208,7 +208,14 @@
 /* Hero aura: the slide's colours glow out into the black around the hero. */
 .lp-main { overflow-x: clip; }
 .lp-hero-wrap { position: relative; isolation: isolate; }
-.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-ctrl { position: relative; z-index: 1; }
+.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-tilt, .lp-hero-wrap > .lp-ctrl { position: relative; z-index: 1; }
+/* Hero hover tilt (values come from Hero.tsx): a gentle 3D lean toward the pointer, the phones drift a little
+   further for depth, and a soft glare follows the pointer. */
+.lp-tilt { --tx: 0; --ty: 0; --glare: 0; border-radius: 26px; transform: perspective(1400px) rotateX(calc(var(--ty) * -5deg)) rotateY(calc(var(--tx) * 6deg)) translate3d(calc(var(--tx) * 8px), calc(var(--ty) * 8px), 0) scale(calc(1 + var(--glare) * 0.008)); transform-style: preserve-3d; will-change: transform; }
+.lp-tilt .lp-phones { translate: calc(var(--tx) * 18px) calc(var(--ty) * 14px); }
+.lp-glare { position: absolute; inset: 0; border-radius: 26px; pointer-events: none; z-index: 3; opacity: var(--glare); background: radial-gradient(520px circle at calc(50% + var(--tx) * 100%) calc(50% + var(--ty) * 100%), rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%); mix-blend-mode: soft-light; }
+.lp-tilt:hover > .lp-tile { box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45); }
+.lp-tilt > .lp-tile { transition: box-shadow 0.4s ease; }
 .lp-aura { position: absolute; z-index: 0; left: 50%; top: -60px; bottom: -120px; width: min(2200px, 160%); transform: translateX(-50%); pointer-events: none; }
 .lp-aura > div { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease; }
 .lp-aura > div.on { opacity: 1; }
