@@ -78,20 +78,20 @@ h1{font-size:32px;font-weight:800;letter-spacing:-.5px;padding:8px 20px 2px}
 const $=id=>document.getElementById(id);const wait=ms=>new Promise(r=>setTimeout(r,ms));
 function tap(el){el.classList.add('tap');setTimeout(()=>el.classList.remove('tap'),180)}
 function go(from,to,back){$(from).classList.add(back?'hidden':'left');$(to).classList.remove('hidden','left')}
-async function toast(t){$('toast').textContent=t;$('toast').classList.add('show');await wait(1400);$('toast').classList.remove('show')}
+async function toast(t){$('toast').textContent=t;$('toast').classList.add('show');await wait(2000);$('toast').classList.remove('show')}
 window.run=async()=>{
   $('prog').style.width='40%';await wait(1200);
   // Shot 1: tick off waterings
   for(const [n,txt,pct] of [[1,'💧 Monstera watered · next in 7 days','60%'],[3,'💧 Fig watered · next in 5 days','80%']]){
-    tap($('p'+n));$('c'+n).classList.add('on');$('prog').style.width=pct;$('done').textContent=(pct==='60%'?'3':'4')+' of 5 done';toast(txt);await wait(1700);}
+    tap($('p'+n));$('c'+n).classList.add('on');$('prog').style.width=pct;$('done').textContent=(pct==='60%'?'3':'4')+' of 5 done';await wait(2300);}
   $('list').style.transform='translateY(-120px)';await wait(1300);$('list').style.transform='none';await wait(900);
   // Shot 2: identify a plant
   tap($('fab'));await wait(250);go('home','scan');$('t1').classList.remove('on');$('t2').classList.add('on');await wait(700);
   $('sl').style.top='86%';$('leaf').style.transform='translate(-50%,-50%) scale(1.15) rotate(-6deg)';await wait(1700);$('sl').style.top='12%';await wait(1500);
-  $('res').classList.add('show');await wait(2200);tap($('add'));toast('🌿 Monstera added');await wait(1600);
+  $('res').classList.add('show');await wait(2200);tap($('add'));await wait(1400);
   // Shot 3: progress
   go('scan','stats');$('t2').classList.remove('on');$('t3').classList.add('on');await wait(500);
   [35,55,48,72,64,88,95].forEach((h,i)=>setTimeout(()=>$('chart').children[i].style.height=h+'%',i*120));await wait(1600);
-  $('sun').classList.add('on');toast('🔥 13-day streak!');await wait(2600);
+  $('sun').classList.add('on');await wait(700);toast('🔥 13-day streak!');await wait(2800);
 };
 </script></body></html>
