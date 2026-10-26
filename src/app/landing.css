@@ -31,14 +31,23 @@
 .lp-phone > div { height: 100%; border-radius: 27px; display: flex; align-items: flex-end; padding: 16px; }
 .lp-phone span { font-size: 26px; color: var(--ink); }
 .lp-side { width: 150px; height: 266px; border-radius: 18px; border: 3px solid var(--bg); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45); }
-.lp-dots { display: flex; gap: 8px; margin: 14px auto 0; max-width: 360px; }
-.lp-dot { flex: 1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.25); overflow: hidden; border: 0; padding: 0; cursor: pointer; position: relative; }
-/* Taller hit area than the 4px bar. */
-.lp-dot::before { content: ""; position: absolute; inset: -14px 0; }
-.lp-dot span { display: block; height: 100%; width: 0; background: #fff; }
-.lp-dot.on span { animation: lp-prog 5s linear forwards; }
-.lp-dot.on.paused span { animation-play-state: paused; }
-.lp-dot.past span { width: 100%; }
+/* Slide controls: arrows either side of labelled tabs, each with a progress bar. */
+.lp-ctrl { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 16px auto 0; max-width: 640px; }
+.lp-arrow { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); cursor: pointer; transition: background 0.2s, transform 0.2s; }
+.lp-arrow:hover { background: rgba(255, 255, 255, 0.18); }
+.lp-arrow:active { transform: scale(0.94); }
+.lp-dots { flex: 1; display: flex; gap: 8px; min-width: 0; }
+.lp-dot { flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 6px 4px; border: 0; border-radius: 10px; background: none; color: rgba(255, 255, 255, 0.5); cursor: pointer; text-align: left; transition: color 0.2s; }
+.lp-dot:hover, .lp-dot.on { color: #fff; }
+.lp-dot b { font: 600 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-dot .bar { display: block; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
+.lp-dot .bar span { display: block; height: 100%; width: 0; background: #fff; }
+.lp-dot.on .bar span { animation: lp-prog var(--dur, 5s) linear forwards; }
+.lp-dot.on.paused .bar span { animation-play-state: paused; }
+.lp-dot.past .bar span { width: 100%; }
+.lp-arrow:focus-visible, .lp-dot:focus-visible { outline: 2px solid var(--yel); outline-offset: 2px; }
+/* Swipe sideways on the hero; vertical scrolling still works. */
+.lp-hero { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .lp-fade { animation: lp-fade 0.6s ease-out; }
 @keyframes lp-prog { to { width: 100%; } }
 @keyframes lp-fade { from { opacity: 0; transform: scale(1.02); } to { opacity: 1; transform: none; } }
@@ -115,14 +124,18 @@
   .lp-nav { display: none; }
   .lp-hero { height: 560px; }
   .lp-hero-copy { left: 22px; right: 22px; }
+  .lp-ctrl { gap: 8px; }
+  .lp-dots { gap: 6px; }
+  .lp-dot { flex: 1 1 auto; padding: 6px 2px; }
+  .lp-dot b { font-size: 9px; letter-spacing: 0; }
   .lp-hero .lp-shade { background: linear-gradient(0deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.2)) !important; }
   .lp-rules > div { padding: 32px 22px !important; }
   .lp-mosaic > .lp-tile { grid-column: span 12 !important; }
   .lp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp-mq, .lp-dot.on span, .lp-fade { animation: none; }
-  .lp-dot.on span { width: 100%; }
+  .lp-mq, .lp-dot.on .bar span, .lp-fade { animation: none; }
+  .lp-dot.on .bar span { width: 100%; }
 }
 
 /* iOS 27 ready bar */
@@ -195,7 +208,7 @@
 /* Hero aura: the slide's colours glow out into the black around the hero. */
 .lp-main { overflow-x: clip; }
 .lp-hero-wrap { position: relative; isolation: isolate; }
-.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-dots { position: relative; z-index: 1; }
+.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-ctrl { position: relative; z-index: 1; }
 .lp-aura { position: absolute; z-index: 0; left: 50%; top: -60px; bottom: -120px; width: min(2200px, 160%); transform: translateX(-50%); pointer-events: none; }
 .lp-aura > div { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease; }
 .lp-aura > div.on { opacity: 1; }

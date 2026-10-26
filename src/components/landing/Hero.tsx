@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SideReels } from "./SideReels";
 
 const SLIDES = [
@@ -43,16 +43,59 @@ const SLIDES = [
   },
 ];
 
-/** Auto-advancing hero, one slide every 5 s; pauses on hover or focus and when motion is reduced. */
+const AUTO_MS = 5000;
+// After someone picks a slide themselves, give them longer to read it before moving on.
+const MANUAL_MS = 12000;
+const SWIPE_PX = 40;
+
+/**
+ * Auto-advancing hero. Change slides with the arrows, the labelled tabs, a swipe or drag, or the left and right arrow keys.
+ * Pauses on hover or focus and when motion is reduced.
+ */
 export function Hero() {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [manual, setManual] = useState(false);
+  const drag = useRef<{ x: number; y: number; id: number } | null>(null);
+  const dragged = useRef(false);
+  const n = SLIDES.length;
 
   useEffect(() => {
     if (paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const t = setTimeout(() => setI((n) => (n + 1) % SLIDES.length), 5000);
+    const t = setTimeout(() => {
+      setManual(false);
+      setI((k) => (k + 1) % n);
+    }, manual ? MANUAL_MS : AUTO_MS);
     return () => clearTimeout(t);
-  }, [i, paused]);
+  }, [i, paused, manual, n]);
+
+  const go = (k: number) => {
+    setManual(true);
+    setI(((k % n) + n) % n);
+  };
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    dragged.current = false;
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    dragged.current = true;
+    go(dx < 0 ? i + 1 : i - 1);
+  }
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "ArrowRight") go(i + 1);
+    else if (e.key === "ArrowLeft") go(i - 1);
+    else return;
+    e.preventDefault();
+  }
 
   const s = SLIDES[i]!;
   return (
@@ -66,6 +109,7 @@ export function Hero() {
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
+      onKeyDown={onKeyDown}
     >
       {/* Glow that spills out of the hero into the black; one layer per slide so they cross-fade. */}
       <div className="lp-aura" aria-hidden="true">
@@ -76,7 +120,23 @@ export function Hero() {
         ))}
       </div>
       <SideReels />
-      <div key={i} className="lp-tile lp-hero lp-fade" aria-live={paused ? "polite" : "off"}>
+      <div
+        key={i}
+        className="lp-tile lp-hero lp-fade"
+        aria-live={paused || manual ? "polite" : "off"}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => (drag.current = null)}
+        // A drag that ends on the CTA should change slide, not follow the link.
+        onClickCapture={(e) => {
+          if (dragged.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            dragged.current = false;
+          }
+        }}
+        onDragStart={(e) => e.preventDefault()}
+      >
         <div className="kb flow" style={{ backgroundImage: s.bg }} />
         <div className="lp-phones" aria-hidden="true">
           <div className="lp-phone bob">
@@ -95,20 +155,38 @@ export function Hero() {
           </div>
         </div>
       </div>
-      <div className="lp-dots" role="group" aria-label="Choose slide">
-        {SLIDES.map((sl, k) => (
-          <button
-            key={sl.tag}
-            type="button"
-            className={`lp-dot${k === i ? " on" : k < i ? " past" : ""}${paused ? " paused" : ""}`}
-            aria-label={`Show slide ${k + 1}: ${sl.title}`}
-            aria-current={k === i ? "true" : undefined}
-            onClick={() => setI(k)}
-          >
-            <span />
-          </button>
-        ))}
+      <div className="lp-ctrl">
+        <button type="button" className="lp-arrow" aria-label="Previous slide" onClick={() => go(i - 1)}>
+          <Chevron dir="left" />
+        </button>
+        <div className="lp-dots" role="group" aria-label="Choose slide">
+          {SLIDES.map((sl, k) => (
+            <button
+              key={sl.tag}
+              type="button"
+              className={`lp-dot${k === i ? " on" : k < i ? " past" : ""}${paused ? " paused" : ""}`}
+              style={{ "--dur": `${manual ? MANUAL_MS : AUTO_MS}ms` } as React.CSSProperties}
+              aria-label={`Show slide ${k + 1}: ${sl.title}`}
+              aria-current={k === i ? "true" : undefined}
+              onClick={() => go(k)}
+            >
+              <b>{sl.tag}</b>
+              <span className="bar"><span key={k === i ? `${i}-${manual}` : undefined} /></span>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="lp-arrow" aria-label="Next slide" onClick={() => go(i + 1)}>
+          <Chevron dir="right" />
+        </button>
       </div>
     </section>
+  );
+}
+
+function Chevron({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={dir === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+    </svg>
   );
 }
