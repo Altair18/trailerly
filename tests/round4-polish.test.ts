@@ -46,3 +46,16 @@ describe("say each thing once", () => {
     expect(beats.map((b) => b.source)).toEqual(["s1", "s2", "s3", "s5", "s4", "s1"]);
   });
 });
+
+import { drift, LINE_IN } from "@/remotion/compositions/Brand";
+import { POSTER_SECOND } from "@/lib/timeline/templates";
+
+describe("motion", () => {
+  it("drifts end where they start, so loops have no seam", () => {
+    for (const cycles of [1, 2]) expect(drift(360, 360, cycles)).toBeCloseTo(drift(0, 360, cycles), 6);
+  });
+  it("a line rises in fully before the poster frame when it starts half a second before it", () => {
+    expect(LINE_IN / 30).toBeLessThanOrEqual(0.5);
+    expect(POSTER_SECOND).toBe(5);
+  });
+});

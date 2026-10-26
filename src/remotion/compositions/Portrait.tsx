@@ -222,7 +222,9 @@ export function PortraitShot({
     opacity = 1;
     const rise = index === 0 ? 1 : interpolate(frame, [0, PORTRAIT_SWAP], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
     const leave = frames ? interpolate(frame, [frames, frames + PORTRAIT_SWAP], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) }) : 0;
-    const y = (1 - rise) * (height - m.y + height * 0.04) - leave * height * 0.025;
+    // Once landed, the card floats a touch (brand look) so a still never sits dead in the frame.
+    const bob = look === "brand" ? (1 - Math.cos((frame / 30) * 1.4)) * 0.5 * height * 0.006 * rise : 0;
+    const y = (1 - rise) * (height - m.y + height * 0.04) - leave * height * 0.025 - bob;
     transform = `translateY(${y}px) scale(${1 - 0.07 * leave}) rotate(${(1 - rise) * 2.5}deg)`;
     dim = 0.55 * leave;
     // The card underneath is gone by the time the new one lands, so its edge never peeks out below.
@@ -293,13 +295,24 @@ export function PortraitLine({ text, look, accent, brand, width, height, first =
     // Agency previews set the line in two tones, already there on the first frame and crossfading between beats.
     const B = brandStyleOf(brand);
     const T = portraitLayout(look, width, height).text;
-    const fade = Math.min(
-      first ? 1 : interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp" }),
-      interpolate(frame, [durationInFrames - 6, durationInFrames], [1, 0], { extrapolateLeft: "clamp" }),
-    );
+    // Later lines rise in with the highlight wiping across; every line lifts away as the next comes on.
+    const leave = interpolate(frame, [durationInFrames - 6, durationInFrames], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.quad) });
     return (
-      <div style={{ position: "absolute", left: T.x, top: T.y, width: T.w, height: T.h, display: "flex", alignItems: "center", justifyContent: "center", opacity: fade }}>
-        <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.112)} align="center" />
+      <div
+        style={{
+          position: "absolute",
+          left: T.x,
+          top: T.y,
+          width: T.w,
+          height: T.h,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: 1 - leave,
+          transform: `translateY(${-leave * width * 0.025}px)`,
+        }}
+      >
+        <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.112)} align="center" enter={first ? undefined : frame} />
       </div>
     );
   }
@@ -401,7 +414,7 @@ function BrandClose({ brand, text, width, height }: { brand?: Brand; text: strin
     <>
       {lineFirst && frame < endAt + 10 && (
         <div style={{ position: "absolute", left: T.x, top: T.y, width: T.w, height: T.h, display: "flex", alignItems: "center", justifyContent: "center", opacity: fade }}>
-          <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.095)} align="center" />
+          <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.095)} align="center" enter={frame} />
         </div>
       )}
       {frame >= endAt && <BrandEndCard brand={brand} line={lineFirst ? undefined : text || undefined} width={width} height={height} frame={frame - endAt} cut={!lineFirst} />}
@@ -458,10 +471,22 @@ function BrandEndCard({ brand, line, width, height, frame, cut }: { brand?: Bran
             fontSize: Math.round(width * 0.052),
             letterSpacing: "0.01em",
             opacity: late,
-            transform: `translateY(${(1 - late) * width * 0.03}px)`,
+            transform: `translateY(${(1 - late) * width * 0.03}px) scale(${1 + 0.04 * Math.max(0, Math.sin(Math.PI * interpolate(frame, [26, 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })))})`,
+            overflow: "hidden",
           }}
         >
           On the App Store
+          {/* One glint across the button as it settles. */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              width: "40%",
+              left: `${interpolate(frame, [22, 42], [-50, 120], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}%`,
+              background: "linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent)",
+            }}
+          />
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

@@ -6,8 +6,17 @@ import { AppIcon, type Brand, PINK, SERIF, UI } from "./parts";
 
 // The "brand" look, built from the agency benchmark (AppVideos.co's iOS 27 header and search samples among 13
 // agency videos): every frame is dressed in the app's own colours and type, the app's screens fill the frame as
-// flat cards (no device frame, no tilt), the words are already on screen at frame 1 and never animate in word by
-// word, and the only motion is the content changing inside the cards. No camera moves.
+// flat cards (no device frame, no tilt) and the words never type in word by word. The opening line is already on
+// screen at frame 1. Later lines rise in as whole lines with the highlight block wiping across, and the backdrop,
+// cards and light drift slowly, always in loops that close on themselves so a looping video has no seam.
+
+/** How far through a drift that loops `cycles` times over `total` frames (0..1, seamless at both ends). */
+export const loopPhase = (frame: number, total: number, cycles = 1) => (total > 0 ? ((frame / total) * cycles) % 1 : 0);
+/** A slow back-and-forth (-1..1) that ends where it starts. */
+export const drift = (frame: number, total: number, cycles = 1, offset = 0) => Math.sin(2 * Math.PI * (loopPhase(frame, total, cycles) + offset));
+
+/** Frames a line takes to rise in (kept short: a line that starts at 4.5 s is whole by the 5 s poster frame). */
+export const LINE_IN = 12;
 
 export const brandStyleOf = (brand?: Brand): BrandStyle => brand?.style ?? paletteFromAccent(brand?.accent ?? PINK);
 
@@ -118,6 +127,7 @@ export function Headline({
   align = "left",
   style,
   lines,
+  enter,
 }: {
   text: string;
   S: BrandStyle;
@@ -126,15 +136,29 @@ export function Headline({
   style?: CSSProperties;
   /** Set lines (three for a big header line); the last one goes on the highlight block. */
   lines?: string[];
+  /** Frames since the line came on, to rise it in; leave out for a line that is simply there. */
+  enter?: number;
 }) {
+  const rise = (delay: number): CSSProperties => {
+    if (enter === undefined) return {};
+    const p = interpolate(enter - delay, [0, LINE_IN - 3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+    return { display: "inline-block", opacity: p, transform: `translateY(${(1 - p) * 0.35}em)` };
+  };
+  const wipe = (delay: number): CSSProperties => {
+    if (enter === undefined) return {};
+    const p = interpolate(enter - delay, [0, LINE_IN - delay], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) });
+    return { clipPath: `inset(-0.2em ${(1 - p) * 100}% -0.2em -0.1em)` };
+  };
   if (lines && lines.length > 2) {
     return (
       <div style={{ ...brandType(S.font), position: "relative", fontSize: size, color: S.ink, textAlign: align, ...style }}>
         {lines.slice(0, -1).map((l, i) => (
-          <div key={i}>{l}</div>
+          <div key={i}>
+            <span style={rise(i * 2)}>{l}</span>
+          </div>
         ))}
         <div style={{ marginTop: "0.08em" }}>
-          <span style={blockStyle(S)}>{lines[lines.length - 1]}</span>
+          <span style={{ ...blockStyle(S), ...wipe(4) }}>{lines[lines.length - 1]}</span>
         </div>
       </div>
     );
@@ -146,14 +170,16 @@ export function Headline({
     <div style={{ ...brandType(S.font), position: "relative", fontSize: size, color: S.ink, textAlign: align, ...style }}>
       {short ? (
         <div>
-          {words.slice(0, -1).join(" ")} <span style={blockStyle(S)}>{words[words.length - 1]}</span>
+          <span style={rise(0)}>{words.slice(0, -1).join(" ")}</span> <span style={{ ...blockStyle(S), ...wipe(3) }}>{words[words.length - 1]}</span>
         </div>
       ) : (
-        <div>{a}</div>
+        <div>
+          <span style={rise(0)}>{a}</span>
+        </div>
       )}
       {b && (
         <div style={{ marginTop: "0.08em" }}>
-          <span style={blockStyle(S)}>{b}</span>
+          <span style={{ ...blockStyle(S), ...wipe(3) }}>{b}</span>
         </div>
       )}
     </div>
@@ -162,11 +188,18 @@ export function Headline({
 
 /** The app's backdrop: its colour in a soft diagonal gradient, a pool of light behind the screens and a faint dashed curve. */
 export function BrandBackdrop({ S, width, height, light }: { S: BrandStyle; width: number; height: number; light: { x: number; y: number } }) {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const stroke = Math.max(2, Math.round(Math.min(width, height) * 0.004));
+  // The pool of light wanders a little and the dashed line flows, once round per video, so loops stay seamless.
+  const lx = light.x + drift(frame, durationInFrames, 1) * width * 0.06;
+  const ly = light.y + drift(frame, durationInFrames, 1, 0.25) * height * 0.05;
+  const dash = stroke * 9;
+  const flow = -loopPhase(frame, durationInFrames, 1) * dash * Math.max(1, Math.round(durationInFrames / 30));
   return (
     <AbsoluteFill style={{ background: `linear-gradient(110deg, ${S.bgDeep} 0%, ${S.bg} 58%, ${S.bg} 100%)` }}>
       <AbsoluteFill
-        style={{ background: `radial-gradient(${width * 0.45}px ${height * 0.7}px at ${light.x}px ${light.y}px, ${withAlpha(S.highlight, 0.16)}, transparent 70%)` }}
+        style={{ background: `radial-gradient(${width * 0.45}px ${height * 0.7}px at ${lx}px ${ly}px, ${withAlpha(S.highlight, 0.16)}, transparent 70%)` }}
       />
       <svg width={width} height={height} style={{ position: "absolute", inset: 0 }}>
         <path
@@ -175,6 +208,7 @@ export function BrandBackdrop({ S, width, height, light }: { S: BrandStyle; widt
           stroke={withAlpha(S.highlight, 0.22)}
           strokeWidth={stroke}
           strokeDasharray={`${stroke * 4} ${stroke * 5}`}
+          strokeDashoffset={flow}
         />
       </svg>
       <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,.18))" }} />
@@ -312,6 +346,12 @@ export function BrandHeaderScene({ shots, width, height, safe, brand }: { shots:
   const L = headerLayout(width, height, safe);
   const radius = Math.round(L.hero.width * 0.07);
   const unique = new Set(shots.map((s) => s.media.src)).size;
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  // The hero floats gently and the cards behind drift the other way (parallax), twice round per loop.
+  const float = drift(frame, durationInFrames, 2);
+  const hero = { ...L.hero, top: Math.round(L.hero.top + float * height * 0.014) };
+  const behind = (box: Box): Box => ({ ...box, left: Math.round(box.left - float * width * 0.004), top: Math.round(box.top - float * height * 0.008) });
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <BrandBackdrop S={S} width={width} height={height} light={{ x: L.hero.left + L.hero.width / 2, y: height * 0.45 }} />
@@ -319,13 +359,13 @@ export function BrandHeaderScene({ shots, width, height, safe, brand }: { shots:
         <>
           {unique > 1 &&
             L.sides.map(({ box, offset }) => (
-              <Card key={offset} box={box} shots={shots} pick={() => offset}
+              <Card key={offset} box={behind(box)} shots={shots} pick={() => offset}
                 blur={Math.round(height * 0.004)}
                 radius={Math.round(box.width * 0.07)}
                 shadow={cardShadow(height)}
                 dim={Math.abs(offset) === 1 ? 0.7 : 0.84} dimColour={S.bgDeep} />
             ))}
-          <Card box={L.hero} shots={shots} pick={(i) => i} radius={radius} shadow={`${cardShadow(height)}, 0 0 0 ${Math.max(2, Math.round(height * 0.003))}px rgba(255,255,255,.12)`} />
+          <Card box={hero} shots={shots} pick={(i) => i} radius={radius} shadow={`${cardShadow(height)}, 0 0 0 ${Math.max(2, Math.round(height * 0.003))}px rgba(255,255,255,.12)`} />
         </>
       )}
     </AbsoluteFill>
@@ -437,6 +477,7 @@ export function spotlight(i: number, count: number): { active: number; shows: (c
 
 export function BrandSearchScene({ shots, width, height, safe, brand }: { shots: SceneShot[]; width: number; height: number; safe?: SafeArea; brand?: Brand }) {
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const S = brandStyleOf(brand);
   const L = searchLayout(width, height, safe);
   const { i, t } = shotAt(shots, frame);
@@ -452,10 +493,12 @@ export function BrandSearchScene({ shots, width, height, safe, brand }: { shots:
           // The light moves from the last card to the new one over the change-over.
           const lit = (card === now.active ? t : 0) + (card === prev.active && i > 0 && prev.active !== now.active ? 1 - t : 0) + (i === 0 && card === 0 ? 1 : 0);
           const on = Math.min(1, lit);
+          // Each card floats on its own phase, so the row breathes rather than sitting still.
+          const lift = drift(frame, durationInFrames, 2, card / 3) * height * 0.008;
           return (
             <Card
               key={card}
-              box={box}
+              box={{ ...box, top: Math.round(box.top + lift) }}
               shots={shots}
               pick={(k) => spotlight(k, shots.length).shows(card)}
               radius={radius}
@@ -492,6 +535,7 @@ export function BrandSearchOverlay({
 }) {
   const S = brandStyleOf(brand);
   const L = searchLayout(width, height, safe);
+  const frame = useCurrentFrame();
   const opacity = useCrossfade(!first, !last);
   const col = L.text;
   const column: CSSProperties = { position: "absolute", left: col.left, top: col.top, width: col.width, height: col.height, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", opacity };
@@ -513,7 +557,7 @@ export function BrandSearchOverlay({
   return (
     <div style={column}>
       {/* Sized so each half sits on one line: two lines at most, leaving the cards their room. */}
-      <Headline text={line} S={S} size={fitSize(splitHeadline(line), S.font, col.width * 0.94, col.height * 0.42)} align="center" />
+      <Headline text={line} S={S} size={fitSize(splitHeadline(line), S.font, col.width * 0.94, col.height * 0.42)} align="center" enter={first ? undefined : frame} />
     </div>
   );
 }
