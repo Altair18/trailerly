@@ -27,7 +27,12 @@ const GLYPH: Record<BrandFont, number> = { geometric: 0.53, condensed: 0.44, edi
 export function splitHeadline(text: string): [string, string] {
   const t = text.trim().replace(/\s+/g, " ");
   const punct = t.search(/[.!?,:;—–] /);
-  if (punct > 0 && punct < t.length - 3) return [t.slice(0, punct + 1), t.slice(punct + 2)];
+  // Break at the punctuation only when the two lines come out about even ("Match," alone over a long line reads badly).
+  if (punct > 0 && punct < t.length - 3) {
+    const a = punct + 1;
+    const b = t.length - punct - 2;
+    if (Math.min(a, b) >= Math.max(a, b) * 0.45) return [t.slice(0, punct + 1), t.slice(punct + 2)];
+  }
   const words = t.split(" ");
   if (words.length < 4) return [t, ""];
   // The split that makes the two lines closest in length.
@@ -41,6 +46,28 @@ export function splitHeadline(text: string): [string, string] {
     }
   }
   return [words.slice(0, best).join(" "), words.slice(best).join(" ")];
+}
+
+/** The split of `text` into `n` lines whose longest line is shortest (ties go to a longer last line). */
+export function splitLines(text: string, n: number): string[] {
+  const words = text.trim().split(/\s+/);
+  if (n <= 1 || words.length < n) return [words.join(" ")];
+  let best: string[] = [words.join(" ")];
+  let score = Infinity;
+  const walk = (from: number, left: number, acc: string[]) => {
+    if (left === 1) {
+      const lines = [...acc, words.slice(from).join(" ")];
+      const s = Math.max(...lines.map((l) => l.length)) - lines[lines.length - 1]!.length * 0.01;
+      if (s < score) {
+        score = s;
+        best = lines;
+      }
+      return;
+    }
+    for (let i = from + 1; i <= words.length - left + 1; i++) walk(i, left - 1, [...acc, words.slice(from, i).join(" ")]);
+  };
+  walk(0, n, []);
+  return best;
 }
 
 /** Font size that sets each part of the headline on one line (or two, for long ones) within `width`. */
@@ -78,7 +105,34 @@ export function blockStyle(S: BrandStyle): CSSProperties {
  * A headline in two tones, the way agencies set it ("Snap a photo." / "Know what it is."): the first part in the ink
  * colour, the second on a highlighter block. A short line keeps one row and blocks its last word.
  */
-export function Headline({ text, S, size, align = "left", style }: { text: string; S: BrandStyle; size: number; align?: "left" | "center"; style?: CSSProperties }) {
+export function Headline({
+  text,
+  S,
+  size,
+  align = "left",
+  style,
+  lines,
+}: {
+  text: string;
+  S: BrandStyle;
+  size: number;
+  align?: "left" | "center";
+  style?: CSSProperties;
+  /** Set lines (three for a big header line); the last one goes on the highlight block. */
+  lines?: string[];
+}) {
+  if (lines && lines.length > 2) {
+    return (
+      <div style={{ ...brandType(S.font), position: "relative", fontSize: size, color: S.ink, textAlign: align, ...style }}>
+        {lines.slice(0, -1).map((l, i) => (
+          <div key={i}>{l}</div>
+        ))}
+        <div style={{ marginTop: "0.08em" }}>
+          <span style={blockStyle(S)}>{lines[lines.length - 1]}</span>
+        </div>
+      </div>
+    );
+  }
   const [a, b] = splitHeadline(text);
   const words = a.split(" ");
   const short = !b && words.length >= 2;
@@ -154,6 +208,7 @@ function Card({
   outline,
   scale = 1,
   position = "50% 0%",
+  blur = 0,
 }: {
   box: Box;
   shots: SceneShot[];
@@ -166,6 +221,8 @@ function Card({
   outline?: string;
   scale?: number;
   position?: string;
+  /** Soften a background card so only the hero reads as a screen. */
+  blur?: number;
 }) {
   const frame = useCurrentFrame();
   const { i, t } = shotAt(shots, frame);
@@ -186,6 +243,7 @@ function Card({
         background: "#000",
         boxShadow: [shadow, outline ? `0 0 0 ${outline}` : ""].filter(Boolean).join(", "),
         transform: `scale(${scale})`,
+        filter: blur ? `blur(${blur}px)` : undefined,
       }}
     >
       {now !== before && t < 1 && <MediaFill media={media(before)} style={fill} />}
@@ -219,8 +277,9 @@ export function headerLayout(width: number, height: number, safe?: SafeArea): He
   const box = safeBox(width, height, safe);
   const h = Math.round(height * 0.8);
   const w = Math.round(h * CARD_ASPECT);
-  const cx = box.left + box.width * 0.8;
-  const hero = { left: Math.round(Math.min(cx - w / 2, box.left + box.width - w)), top: Math.round((height - h) / 2), width: w, height: h };
+  // The hero sits at the safe box's right edge (up to a fifth of it may hang past) so the words get more room.
+  const cx = box.left + box.width * 0.9;
+  const hero = { left: Math.round(Math.min(cx - w / 2, box.left + box.width - w * 0.8)), top: Math.round((height - h) / 2), width: w, height: h };
   const gap = Math.round(height * 0.04);
   const textLeft = box.left + Math.round(box.width * 0.03);
   const text = { left: textLeft, top: box.top, width: hero.left - Math.round(box.width * 0.05) - textLeft, height: box.height };
@@ -254,7 +313,8 @@ export function BrandHeaderScene({ shots, width, height, safe, brand }: { shots:
         <>
           {unique > 1 &&
             L.sides.map(({ box, offset }) => (
-              <Card key={offset} box={box} shots={shots} pick={Math.abs(offset) === 1 ? (i) => i + offset : () => offset}
+              <Card key={offset} box={box} shots={shots} pick={() => offset}
+                blur={Math.round(height * 0.004)}
                 radius={Math.round(box.width * 0.07)}
                 shadow={cardShadow(height)}
                 dim={Math.abs(offset) === 1 ? 0.7 : 0.84} dimColour={S.bgDeep} />
@@ -306,13 +366,27 @@ export function BrandHeaderOverlay({
     );
   }
   const line = text ?? "";
-  const size = headlineSize(splitHeadline(line), S.font, col.width, col.height * 0.25);
+  const { size, lines } = headerHeadline(line, S.font, col.width, col.height);
   return (
     <div style={column}>
       <Wordmark brand={brand} S={S} size={Math.round(col.height * 0.075)} />
-      <Headline text={line} S={S} size={size} />
+      <Headline text={line} S={S} size={size} lines={lines} />
     </div>
   );
+}
+
+/**
+ * The header line as big as the column allows: two lines, or three when that sets the type bigger (a long hook in
+ * the narrow header column). Height is shared with the wordmark above it.
+ */
+export function headerHeadline(text: string, font: BrandFont, width: number, height: number): { size: number; lines?: string[] } {
+  const room = height * 0.8;
+  const fit = (parts: string[]) => Math.min(width / (Math.max(6, ...parts.map((p) => p.length)) * GLYPH[font]), room / (parts.length * 1.12));
+  const two = splitHeadline(text).filter(Boolean);
+  const three = splitLines(text, 3);
+  const twoSize = Math.min(fit(two), height * 0.3);
+  const threeSize = three.length === 3 ? Math.min(fit(three), height * 0.3) : 0;
+  return threeSize > twoSize * 1.12 ? { size: Math.round(threeSize), lines: three } : { size: Math.round(twoSize) };
 }
 
 function Wordmark({ brand, S, size, align = "left" }: { brand?: Brand; S: BrandStyle; size: number; align?: "left" | "center" }) {

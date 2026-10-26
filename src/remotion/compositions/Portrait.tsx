@@ -380,20 +380,76 @@ export function PortraitBrand({ brand, text, look, width, height }: { brand?: Br
  * The brand look's close: a reason to install as the headline ("Never lose a plant again"), with the app's icon and
  * name under it, already there on the first frame, over the last shot. Agency end cards give a reason, not just a name.
  */
+/** The end card's own length: long enough to read the name, short enough to stay a sign-off. */
+export const END_CARD_SECONDS = 2.4;
+
+/**
+ * Brand close: the closing line over the last card, then the end card takes the whole frame (the app's icon, big,
+ * its name and "On the App Store" on the brand colour), as agency previews sign off. A short close is all end card,
+ * with the closing line on it.
+ */
 function BrandClose({ brand, text, width, height }: { brand?: Brand; text: string; width: number; height: number }) {
   const frame = useCurrentFrame();
+  const { fps, durationInFrames } = useVideoConfig();
   const B = brandStyleOf(brand);
   const T = portraitLayout("brand", width, height).text;
+  const endFrames = Math.round(END_CARD_SECONDS * fps);
+  const lineFirst = durationInFrames >= endFrames + fps;
+  const endAt = lineFirst ? durationInFrames - endFrames : 0;
   const fade = interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
-  const icon = Math.round(width * 0.075);
   return (
-    <div style={{ position: "absolute", left: T.x, top: T.y, width: T.w, height: T.h, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: width * 0.025, opacity: fade }}>
-      <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.095)} align="center" />
-      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: width * 0.022 }}>
-        <AppIcon brand={brand} size={icon} />
-        <div style={{ ...brandType(B.font), color: B.ink, fontSize: Math.round(width * 0.05), lineHeight: 1 }}>{brand?.name ?? ""}</div>
-      </div>
-    </div>
+    <>
+      {lineFirst && frame < endAt + 10 && (
+        <div style={{ position: "absolute", left: T.x, top: T.y, width: T.w, height: T.h, display: "flex", alignItems: "center", justifyContent: "center", opacity: fade }}>
+          <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.095)} align="center" />
+        </div>
+      )}
+      {frame >= endAt && <BrandEndCard brand={brand} line={lineFirst ? undefined : text} width={width} height={height} frame={frame - endAt} />}
+    </>
+  );
+}
+
+function BrandEndCard({ brand, line, width, height, frame }: { brand?: Brand; line?: string; width: number; height: number; frame: number }) {
+  const { fps } = useVideoConfig();
+  const B = brandStyleOf(brand);
+  const cover = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
+  const pop = spring({ frame: frame - 4, fps, config: { damping: 16, stiffness: 120 } });
+  const late = spring({ frame: frame - 12, fps, config: { damping: 18, stiffness: 120 } });
+  const icon = Math.round(width * 0.3);
+  const name = brand?.name ?? "";
+  return (
+    <AbsoluteFill style={{ opacity: cover }}>
+      <BrandBackdrop S={B} width={width} height={height} light={{ x: width / 2, y: height * 0.42 }} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: width * 0.05, padding: "0 8%" }}>
+        <div style={{ opacity: pop, transform: `translateY(${(1 - pop) * width * 0.05}px) scale(${0.9 + 0.1 * pop})`, filter: `drop-shadow(0 ${width * 0.03}px ${width * 0.06}px rgba(0,0,0,.45))` }}>
+          <AppIcon brand={brand} size={icon} />
+        </div>
+        <div style={{ ...brandType(B.font), position: "relative", color: B.ink, textAlign: "center", lineHeight: 1.05, fontSize: headlineSize([name], B.font, width * 0.84, width * 0.13), opacity: pop }}>{name}</div>
+        {line?.trim() && (
+          <div style={{ position: "relative", opacity: late }}>
+            <Headline text={line} S={B} size={headlineSize(splitHeadline(line), B.font, width * 0.84, width * 0.07)} align="center" />
+          </div>
+        )}
+        <div
+          style={{
+            ...UI,
+            position: "relative",
+            marginTop: width * 0.02,
+            padding: `${width * 0.022}px ${width * 0.06}px`,
+            borderRadius: 999,
+            background: B.highlight,
+            color: B.bgDeep,
+            fontWeight: 800,
+            fontSize: Math.round(width * 0.042),
+            letterSpacing: "0.01em",
+            opacity: late,
+            transform: `translateY(${(1 - late) * width * 0.03}px)`,
+          }}
+        >
+          On the App Store
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
   );
 }
 
