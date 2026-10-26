@@ -194,6 +194,11 @@ export function Drafts({ packId }: { packId: string }) {
               <p className="disp" style={{ margin: "8px 0 0", fontSize: 32 }}>Full size, no watermark</p>
               <p className="mu" style={{ margin: "6px 0 0", fontSize: 14 }}>Each file is named for its slot in App Store Connect.</p>
             </div>
+            {pack?.zip && (
+              <a className="btn btn-light" href={pack.zip} style={{ justifySelf: "start" }}>
+                Download all (.zip, with a sheet of where each file goes)
+              </a>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
               {finals.map((f) => (
                 <a key={f.fileName} className="btn btn-ghost" href={f.url} download={f.fileName} style={{ justifyContent: "space-between", gap: 10 }}>
@@ -231,7 +236,7 @@ export function Drafts({ packId }: { packId: string }) {
               {retrying ? "Retrying…" : "Retry full-size files"}
             </button>
           )}
-          {pack?.status === "ready" && <a className="btn btn-light" href="#downloads">Download</a>}
+          {pack?.status === "ready" && <a className="btn btn-light" href={pack.zip ?? "#downloads"}>{pack.zip ? "Download all" : "Download"}</a>}
         </div>
       </main>
     </>

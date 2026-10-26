@@ -98,3 +98,33 @@ describe("stripe webhook", () => {
     expect(inserted).toEqual([]);
   });
 });
+
+describe("pack zip", async () => {
+  const { crc32, zipFiles } = await import("@/lib/zip");
+  const { packFiles, placementSheet } = await import("@/lib/placement");
+
+  it("computes the standard CRC-32", () => {
+    expect(crc32(Buffer.from("123456789"))).toBe(0xcbf43926);
+  });
+  it("writes a zip with one entry per file and a closing directory", () => {
+    const zip = zipFiles([{ name: "a.txt", data: Buffer.from("hello") }, { name: "b.txt", data: Buffer.from("world!") }]);
+    expect(zip.readUInt32LE(0)).toBe(0x04034b50);
+    const end = zip.length - 22;
+    expect(zip.readUInt32LE(end)).toBe(0x06054b50);
+    expect(zip.readUInt16LE(end + 10)).toBe(2);
+    expect(zip.includes("hello")).toBe(true);
+  });
+  it("lists every file of the pack, stills and variants included, in the sheet", () => {
+    const files = packFiles(["preview", "header", "search", "header_b"]);
+    expect(files.map((f) => f.fileName)).toEqual([
+      "appstore-preview-886x1920.mp4",
+      "appstore-header-21x9.mp4",
+      "appstore-header-still-21x9.png",
+      "appstore-universal-16x9.png",
+      "appstore-search-3x2.mp4",
+      "appstore-search-still-3x2.png",
+      "appstore-header-21x9-b.mp4",
+    ]);
+    expect(placementSheet("Royal Match", files)).toContain("Treatment B");
+  });
+});

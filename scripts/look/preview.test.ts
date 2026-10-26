@@ -58,6 +58,7 @@ it("renders the preview looks", async () => {
       await renderOutput({
         spec: "preview",
         outFile: join(D, `preview-${name}-${look}.mp4`),
+        silentAudio: process.env.AUDIO === "1",
         props: {
           timeline,
           clipUrls: { clip_1: url("clip_1.mp4"), clip_2: url("clip_2.mp4"), clip_3: url("clip_3.mp4") },

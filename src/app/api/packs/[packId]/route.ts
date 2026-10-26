@@ -8,6 +8,7 @@ import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
 import { appScreenshots } from "@/lib/media/screenshots";
 import { Listing } from "@/lib/schemas/listing";
 import { stillsFor } from "@/lib/specs/stills";
+import { PACK_ZIP } from "@/lib/placement";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { downloadUrl, paths, signedUrls } from "@/lib/storage";
 import { checkoutOpen } from "@/lib/stripe";
@@ -60,6 +61,7 @@ export async function GET(_req: Request, { params }: Params) {
       }),
     ),
   );
+  const zip = Object.keys(finals).length ? await downloadUrl(paths.final(pack.id, PACK_ZIP), zipName(pack.app?.name)) : null;
   const { data: app } = await db.from("apps").select("listing_json").eq("id", pack.app_id).single();
   const listing = Listing.safeParse(app?.listing_json);
   const images = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
@@ -89,7 +91,14 @@ export async function GET(_req: Request, { params }: Params) {
     })),
     images,
     checkout: checkoutOpen(),
+    zip,
   });
+}
+
+/** "Royal Match" -> "royal-match-trailerly.zip". */
+function zipName(appName: string | undefined): string {
+  const slug = (appName ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  return `${slug || "app"}-trailerly.zip`;
 }
 
 const Patch = z.union([

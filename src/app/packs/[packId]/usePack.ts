@@ -46,6 +46,8 @@ export interface PackState {
   images: Record<string, string>;
   /** True when Stripe is set up and the pay button can show. */
   checkout: boolean;
+  /** Every full-size file plus the placement sheet in one zip, once paid. */
+  zip: string | null;
 }
 
 /** Load a pack and keep polling every 2 s while `busy(pack)` is true. */

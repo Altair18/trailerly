@@ -66,7 +66,9 @@ export const renderFinal = task({
     const specs = draftSpecsFor(variantHooks(chosen, (pack.hooks_json ?? []) as Hook[]));
     await setPackStatus(packId, "rendering");
     const { rendered, failed } = await compose.triggerAndWait({ packId, specs, final: true }).unwrap();
-    await packagePack.triggerAndWait({ packId });
+    // The zip is a convenience on top of the single files, so its failure doesn't fail the pack.
+    const zipped = await packagePack.triggerAndWait({ packId, specs: rendered });
+    if (!zipped.ok) logger.warn("No zip", { packId });
     await setPackStatus(packId, finalStatus(specs, rendered));
     return { rendered, failed };
   },
