@@ -343,3 +343,4 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-sway, .lp-vine, .lp-twinkle, .lp-drift, .lp-beam, .lp-bob, .lp-pulse { animation: none; }
 }
+.lp-hero p.lp-hero-price { margin: 14px 0 0; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.82); }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { HeroScene, type SceneKey } from "./HeroScene";
+import { CHECKOUT_LIVE, PRICES } from "./pricing";
 import { SideReels } from "./SideReels";
 
 const SLIDES = [
@@ -46,6 +47,11 @@ const SLIDES = [
     aura: ["#FF7A1A", "#FFE135", "#FF5A4E"],
   },
 ];
+
+// One honest line under the buttons so the price is clear before anyone clicks.
+const PRICE_LINE = PRICES.launch
+  ? `Free drafts. ${CHECKOUT_LIVE ? "" : "Packs will be "}${PRICES.launch}${CHECKOUT_LIVE ? " per pack" : ""}, paid once. No subscription.`
+  : "Free drafts. Pay once per pack. No subscription.";
 
 const AUTO_MS = 5000;
 // After someone picks a slide themselves, give them longer to read it before moving on.
@@ -197,6 +203,7 @@ export function Hero() {
               <Link className="btn btn-primary" href="/packs/new" style={{ minHeight: 52, fontSize: 16 }}>{s.cta}</Link>
               <a className="btn btn-ghost" href="#explore" style={{ minHeight: 52, fontSize: 16, backdropFilter: "blur(8px)" }}>See examples</a>
             </div>
+            <p className="lp-hero-price">{PRICE_LINE}</p>
           </div>
         </div>
         <div className="lp-glare" aria-hidden="true" />
