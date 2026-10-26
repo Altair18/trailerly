@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, metadata, task } from "@trigger.dev/sdk";
 import { iconAccent } from "@/lib/media/accent";
+import { lintLandscapeTimeline } from "@/lib/media/render-lint";
 import { appScreenshots } from "@/lib/media/screenshots";
 import { loadPackWithApp, readyClips } from "@/lib/packs";
 import { Listing } from "@/lib/schemas/listing";
 import { renderOutput, renderStillImage } from "@/lib/render";
-import { DRAFT_SCALE, OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
+import { DRAFT_SCALE, isLandscape, OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { stillSecond, stillsFor } from "@/lib/specs/stills";
 import { paths, signedUrls, uploadFile } from "@/lib/storage";
 import { Timeline } from "@/lib/timeline/schema";
@@ -63,6 +64,11 @@ export const compose = task({
             props,
             onProgress: (p) => metadata.set(`progress.${id}`, Math.round(p * 100)),
           });
+          // Pacing checks on header and search: logged so slow or crowded cuts show up in run logs, never blocking.
+          if (isLandscape(spec)) {
+            const issues = lintLandscapeTimeline(timeline);
+            if (issues.length) logger.warn("Render lint", { packId, spec: id, issues });
+          }
           // iOS 27 stills come from the same timeline, at the hook's strongest frame.
           for (const still of stillsFor(id)) {
             try {

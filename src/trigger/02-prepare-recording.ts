@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
 import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
-import { blurRegions, chromeCrop, coveredShare, cutClip, frameAt, idleSpans, normalise, padRegions, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
+import { blankSpans } from "@/lib/media/render-lint";
+import { blurRegions, chromeCrop, coveredShare, cutClip, frameAt, idleSpans, mergeSpans, normalise, padRegions, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
 import { generateJson } from "@/lib/llm/claude";
 import { Brief } from "@/lib/schemas/brief";
 import { ShotList } from "@/lib/schemas/shotlist";
@@ -55,7 +56,8 @@ export const prepareRecording = task({
         await uploadFile(paths.poster(packId, version, n), posterFile, "image/jpeg");
         const clip: Clip = { id: `clip_${n}`, ...r, path: paths.clip(packId, version, n), poster_path: paths.poster(packId, version, n) };
         try {
-          const idle = await idleSpans(clipFile, r.duration);
+          // A half-empty screen (a camera view that never loaded, a list with one row) is as dull as a frozen one.
+          const idle = mergeSpans([...(await idleSpans(clipFile, r.duration)), ...(await blankSpans(clipFile))]);
           if (idle.length) clip.idle = idle;
         } catch (err) {
           logger.warn("Dead-time check failed", { packId, clip: clip.id, error: (err as Error).message });
