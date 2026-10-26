@@ -191,3 +191,31 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-rec-dot, .lp-rec-rows i, .lp-flowline span, .lp-outs li, .lp-out-media { animation: none; }
 }
+
+/* Hero aura: the slide's colours glow out into the black around the hero. */
+.lp-main { overflow-x: clip; }
+.lp-hero-wrap { position: relative; isolation: isolate; }
+.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-dots { position: relative; z-index: 1; }
+.lp-aura { position: absolute; z-index: 0; left: 50%; top: -60px; bottom: -120px; width: min(2200px, 160%); transform: translateX(-50%); pointer-events: none; }
+.lp-aura > div { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease; }
+.lp-aura > div.on { opacity: 1; }
+.lp-aura i { position: absolute; border-radius: 50%; filter: blur(110px); opacity: 0.5; animation: lp-breathe 9s ease-in-out infinite alternate; }
+.lp-aura i:nth-child(1) { left: 6%; top: 18%; width: 34%; height: 62%; }
+.lp-aura i:nth-child(2) { right: 6%; top: 10%; width: 34%; height: 66%; animation-delay: -3s; }
+.lp-aura i:nth-child(3) { left: 30%; bottom: 0; width: 40%; height: 34%; opacity: 0.32; animation-delay: -6s; }
+@keyframes lp-breathe { from { transform: scale(0.9) translate(-3%, 2%); } to { transform: scale(1.1) translate(3%, -2%); } }
+@media (max-width: 640px) { .lp-aura i { filter: blur(70px); opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .lp-aura i { animation: none; } .lp-aura > div { transition: none; } }
+
+/* Side reels in the gutters beside the hero */
+.lp-reel { display: none; position: absolute; top: 20px; height: 600px; width: clamp(110px, calc((100vw - 1320px) / 2 - 56px), 190px); overflow: hidden; z-index: 0; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent); }
+.lp-reel.left { right: calc(100% + 8px); }
+.lp-reel.right { left: calc(100% + 8px); }
+.lp-reel-track { display: grid; gap: 14px; animation: lp-reel 60s linear infinite; }
+.lp-reel.right .lp-reel-track { animation-direction: reverse; }
+.lp-reel-tile { border-radius: 14px; opacity: 0.4; background-size: 200% 200%; display: flex; align-items: flex-end; padding: 10px; }
+.lp-reel-tile span { font-size: 15px; color: var(--ink); }
+@keyframes lp-reel { to { transform: translateY(calc(-50% - 7px)); } }
+@media (min-width: 1600px) { .lp-reel { display: block; } }
+@media (prefers-reduced-motion: reduce) { .lp-reel-track { animation: none; } }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { SideReels } from "./SideReels";
 
 const SLIDES = [
   {
@@ -14,6 +15,7 @@ const SLIDES = [
     side: "#38D9FF",
     hook: "Stop guessing when to water",
     tagBg: "#FFE135",
+    aura: ["#FF2E88", "#9D7BFF", "#FF7A1A"],
   },
   {
     tag: "iOS 27 ready",
@@ -25,6 +27,7 @@ const SLIDES = [
     side: "#FF2E88",
     hook: "Every plant, one reminder",
     tagBg: "#B8F23A",
+    aura: ["#38D9FF", "#2EE6A6", "#9D7BFF"],
   },
   {
     tag: "A/B ready",
@@ -36,6 +39,7 @@ const SLIDES = [
     side: "#2EE6A6",
     hook: "POV: your plants outlive your goldfish",
     tagBg: "#38D9FF",
+    aura: ["#FF7A1A", "#FFE135", "#FF5A4E"],
   },
 ];
 
@@ -54,7 +58,7 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="wrap"
+      className="wrap lp-hero-wrap"
       style={{ paddingTop: 20 }}
       aria-roledescription="carousel"
       aria-label="What Trailerly makes"
@@ -63,6 +67,15 @@ export function Hero() {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
+      {/* Glow that spills out of the hero into the black; one layer per slide so they cross-fade. */}
+      <div className="lp-aura" aria-hidden="true">
+        {SLIDES.map((sl, k) => (
+          <div key={sl.tag} className={k === i ? "on" : undefined}>
+            {sl.aura.map((c, n) => <i key={n} style={{ background: c }} />)}
+          </div>
+        ))}
+      </div>
+      <SideReels />
       <div key={i} className="lp-tile lp-hero lp-fade" aria-live={paused ? "polite" : "off"}>
         <div className="kb flow" style={{ backgroundImage: s.bg }} />
         <div className="lp-phones" aria-hidden="true">

@@ -95,7 +95,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main>
+      <main className="lp-main">
         <Hero />
         <LinkBar />
 
