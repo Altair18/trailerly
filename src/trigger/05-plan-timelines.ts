@@ -8,7 +8,7 @@ import { Brief } from "@/lib/schemas/brief";
 import { isPrivate } from "@/lib/schemas/clips";
 import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
-import { skipDeadStarts } from "@/lib/timeline/dead-time";
+import { avoidDeadTime } from "@/lib/timeline/dead-time";
 import { enforceSpec } from "@/lib/timeline/enforce";
 import { planTimeline } from "@/lib/timeline/plan";
 import { TEMPLATE_SYSTEM, TemplateFill } from "@/lib/timeline/templates";
@@ -84,7 +84,7 @@ export const planTimelines = task({
       if (planned.timeline.template) usedTemplates.push(planned.timeline.template);
       plannedBy[planned.source] += 1;
       // Never open a shot on a loading screen or a frozen stretch when the clip has better footage after it.
-      const timeline = skipDeadStarts(planned.timeline, clips);
+      const timeline = avoidDeadTime(planned.timeline, clips);
       timelines[id] = timeline;
       await db
         .from("outputs")

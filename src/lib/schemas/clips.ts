@@ -25,6 +25,8 @@ export const ClipNotes = z.object({
   private_regions: z.array(Region).optional(),
   /** True once those regions have been blurred in the stored clip. */
   blurred: z.boolean().optional(),
+  /** Share of the frame (0 to 1) under that blur. */
+  blur_share: z.number().min(0).max(1).optional(),
   /** Which shot of the shot list (1-based) this clip films, when there was a shot list. */
   shot: z.number().int().min(1).nullable().optional(),
 });
@@ -44,8 +46,15 @@ export const Clip = z.object({
 export type Clip = z.infer<typeof Clip>;
 export const Clips = z.array(Clip);
 
-/** Still shows personal data: flagged and not (yet) blurred. */
-export const isPrivate = (notes?: ClipNotes | null) => Boolean(notes?.personal_info && !notes.blurred);
+/** Above this share of the frame blurred, a clip shows nothing readable and is treated like an unblurred one. */
+export const MAX_BLUR_SHARE = 0.6;
+
+/**
+ * Not fit to show as is: flagged for personal data and either not (yet) blurred, or blurred over so much of the
+ * frame that only grey blur is left. The planner leaves such clips out when screenshots or clean clips can fill in.
+ */
+export const isPrivate = (notes?: ClipNotes | null) =>
+  Boolean(notes?.personal_info && (!notes.blurred || (notes.blur_share ?? 0) > MAX_BLUR_SHARE));
 
 /** Seconds of a clip where nothing happens. */
 export const idleSeconds = (clip: Pick<Clip, "idle">) => (clip.idle ?? []).reduce((n, s) => n + s.duration, 0);

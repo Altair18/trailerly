@@ -149,12 +149,12 @@ describe("draft quality fixes", () => {
   });
 
   it("moves a shot that opens on dead time to the live part of the clip", async () => {
-    const { skipDeadStarts } = await import("@/lib/timeline/dead-time");
+    const { avoidDeadTime } = await import("@/lib/timeline/dead-time");
     const clips = [
       { id: "clip_1", duration: 8, idle: [{ start: 0, duration: 2 }] },
       { id: "clip_2", duration: 4, idle: [{ start: 0, duration: 2 }] },
     ];
-    const t = skipDeadStarts(
+    const t = avoidDeadTime(
       {
         segments: [
           { type: "screen", start: 0, duration: 5, clip_id: "clip_1" },
@@ -166,5 +166,56 @@ describe("draft quality fixes", () => {
     expect(t.segments[0]!.clip_offset).toBe(2);
     // No room to shift: left as planned.
     expect(t.segments[1]!.clip_offset).toBeUndefined();
+  });
+
+  it("moves a segment that runs into dead time onto live footage", async () => {
+    const { avoidDeadTime } = await import("@/lib/timeline/dead-time");
+    // Clip 2 of a real pack: dark, empty canvas at 1.73-6.2 s and 7.23-11.43 s.
+    const clips = [{ id: "clip_2", duration: 12, idle: [{ start: 1.73, duration: 4.47 }, { start: 7.23, duration: 4.2 }] }];
+    const t = avoidDeadTime(
+      {
+        segments: [
+          { type: "screen", start: 0, duration: 2.4, clip_id: "clip_2", clip_offset: 6.2 },
+          { type: "screen", start: 2.4, duration: 1.5, clip_id: "clip_2", clip_offset: 0 },
+          { type: "screen", start: 3.9, duration: 1, clip_id: "clip_2", clip_offset: 6.2 },
+        ],
+      },
+      clips,
+    );
+    // 2.4 s fits in no live stretch, so it takes the window with the least dead time: 0-2.4 s (0.67 s dead,
+    // against 1.4 s as planned).
+    expect(t.segments[0]!.clip_offset).toBe(0);
+    // Already live: left alone.
+    expect(t.segments[1]!.clip_offset).toBe(0);
+    expect(t.segments[2]!.clip_offset).toBe(6.2);
+  });
+});
+
+describe("blurred clips", () => {
+  it("measures blur by the union of the boxes", async () => {
+    const { coveredShare } = await import("@/lib/media/ffmpeg");
+    expect(coveredShare([])).toBe(0);
+    expect(coveredShare([{ x: 0, y: 0, w: 1, h: 0.5 }])).toBeCloseTo(0.5, 2);
+    // Two overlapping boxes count once.
+    expect(coveredShare([{ x: 0, y: 0, w: 1, h: 0.5 }, { x: 0, y: 0.25, w: 1, h: 0.5 }])).toBeCloseTo(0.75, 2);
+  });
+
+  it("treats a clip blurred over most of the frame like a private one", async () => {
+    const { isPrivate } = await import("@/lib/schemas/clips");
+    const base = { label: "Chat", interest: 3, personal_info: true };
+    expect(isPrivate({ ...base })).toBe(true);
+    expect(isPrivate({ ...base, blurred: true, blur_share: 0.2 })).toBe(false);
+    expect(isPrivate({ ...base, blurred: true, blur_share: 0.9 })).toBe(true);
+    expect(isPrivate({ ...base, personal_info: false })).toBe(false);
+  });
+
+  it("plans on screenshots when every clip is blurred over", async () => {
+    const { safeClips } = await import("@/lib/timeline/plan");
+    const notes = { label: "Chat", interest: 3, personal_info: true, blurred: true, blur_share: 0.9 };
+    const clips = [
+      { id: "clip_1", duration: 6, notes },
+      { id: "clip_2", duration: 6, notes: { ...notes, blur_share: 0.3 } },
+    ];
+    expect(safeClips(clips, { minSeconds: 15 }, 15).map((c) => c.id)).toEqual(["clip_2"]);
   });
 });
