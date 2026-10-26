@@ -23,22 +23,20 @@ export async function POST(req: Request) {
     // Delayed payment methods complete the session unpaid and confirm later with async_payment_succeeded.
     if (packId && session.payment_status === "paid") {
       const db = supabaseAdmin();
-      // Stripe retries webhooks, and both events can arrive for one session: the unique session id makes the
-      // insert the gate, so only the first delivery starts a render.
-      const { data: inserted, error } = await db
+      // Stripe delivers at least once, and both events can arrive for one session. Every step here is safe to
+      // repeat: the payment row is unique per session, the status only moves draft -> paid, and the render is keyed
+      // on the session, so a redelivery after a failed trigger starts it while a duplicate does nothing.
+      const { error } = await db
         .from("payments")
         .upsert(
           { pack_id: packId, stripe_session_id: session.id, amount_pence: session.amount_total ?? 0, status: session.payment_status },
           { onConflict: "stripe_session_id", ignoreDuplicates: true },
-        )
-        .select("id");
+        );
       // A failed write returns 500 so Stripe delivers the event again.
       if (error) return NextResponse.json({ error: "Couldn't record the payment" }, { status: 500 });
-      if (inserted.length > 0) {
-        const { error: statusError } = await db.from("packs").update({ status: "paid" }).eq("id", packId).eq("status", "draft");
-        if (statusError) return NextResponse.json({ error: "Couldn't mark the pack paid" }, { status: 500 });
-        await tasks.trigger<typeof renderFinal>("render-final", { packId }, { idempotencyKey: `final-${session.id}` });
-      }
+      const { error: statusError } = await db.from("packs").update({ status: "paid" }).eq("id", packId).eq("status", "draft");
+      if (statusError) return NextResponse.json({ error: "Couldn't mark the pack paid" }, { status: 500 });
+      await tasks.trigger<typeof renderFinal>("render-final", { packId }, { idempotencyKey: `final-${session.id}`, idempotencyKeyTTL: "30d" });
     }
   }
   return NextResponse.json({ received: true });

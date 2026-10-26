@@ -46,13 +46,10 @@ vi.mock("@/lib/stripe", () => ({ stripe: () => ({ webhooks: { constructEvent: ()
 vi.mock("@/lib/supabase/admin", () => ({
   supabaseAdmin: () => ({
     from: (table: string) => ({
-      upsert: (row: { stripe_session_id: string }) => ({
-        select: async () => {
-          if (inserted.includes(row.stripe_session_id)) return { data: [], error: null };
-          inserted.push(row.stripe_session_id);
-          return { data: [{ id: "pay_1" }], error: null };
-        },
-      }),
+      upsert: async (row: { stripe_session_id: string }) => {
+        if (!inserted.includes(row.stripe_session_id)) inserted.push(row.stripe_session_id);
+        return { error: null };
+      },
       update: (u: { status: string }) => ({
         eq: () => ({ eq: async () => (statusUpdates.push(`${table}:${u.status}`), { error: null }) }),
       }),
@@ -84,11 +81,13 @@ describe("stripe webhook", () => {
     expect(trigger.mock.calls[0]![0]).toBe("render-final");
   });
 
-  it("ignores a repeat delivery of the same session", async () => {
+  it("keys the render on the session, so a repeat delivery can't start a second one", async () => {
     event = session("paid");
     await post();
     await post();
-    expect(trigger).toHaveBeenCalledTimes(1);
+    expect(inserted).toEqual(["cs_1"]);
+    const keys = trigger.mock.calls.map((c) => (c[2] as { idempotencyKey: string }).idempotencyKey);
+    expect(new Set(keys)).toEqual(new Set(["final-cs_1"]));
   });
 
   it("waits for delayed payments to clear", async () => {
