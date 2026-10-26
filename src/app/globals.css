@@ -196,3 +196,9 @@ textarea.field { padding: 14px 18px; resize: vertical; line-height: 1.4; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 /* One visible keyboard focus ring for links and buttons on the dark page (specific components can override). */
 :where(a, button, summary, [role="slider"], [tabindex]):focus-visible { outline: 2px solid var(--yel); outline-offset: 3px; }
+/* Privacy and terms pages. */
+.legal { max-width: 760px; padding-top: 48px; padding-bottom: 80px; line-height: 1.65; }
+.legal h1 { font-size: clamp(48px, 8vw, 72px); margin: 0 0 6px; }
+.legal h2 { font-size: 22px; margin: 36px 0 10px; }
+.legal ul { padding-left: 20px; display: grid; gap: 8px; }
+.legal a { color: var(--tx); }

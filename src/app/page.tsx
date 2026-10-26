@@ -231,6 +231,11 @@ export default function Home() {
             <a href="#how">How it works</a>
             <a href="#faq">FAQ</a>
           </nav>
+          <nav className="lp-fl" aria-label="Legal">
+            <b style={{ fontSize: 14 }}>Legal</b>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+          </nav>
           <nav className="lp-fl" aria-label="Account">
             <b style={{ fontSize: 14 }}>Account</b>
             <Link href="/login">Log in</Link>
