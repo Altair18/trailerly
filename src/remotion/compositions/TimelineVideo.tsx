@@ -133,11 +133,11 @@ export function underLine(seg: Segment, overlays: Segment[]): boolean {
   return overlays.some((o) => o.start < end - 0.05 && o.start + o.duration > seg.start + 0.05);
 }
 
-/** Whether a caption sits mostly over a store screenshot. */
+/** Whether a caption sits mostly over a store screenshot that still shows its own headline (not cropped off). */
 export function overScreenshot(o: Segment, base: Segment[]): boolean {
   const end = o.start + o.duration;
   const covered = base
-    .filter((b) => b.type === "screenshot")
+    .filter((b) => b.type === "screenshot" && !b.crop)
     .reduce((sum, b) => sum + Math.max(0, Math.min(end, b.start + b.duration) - Math.max(o.start, b.start)), 0);
   return covered > o.duration / 2;
 }
@@ -152,7 +152,7 @@ function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls
       seg.type === "screen" && src
         ? { kind: "video", src, trimBefore: Math.round((seg.clip_offset ?? 0) * fps) }
         : seg.type === "screenshot" && image
-          ? { kind: "image", src: image }
+          ? { kind: "image", src: image, crop: seg.crop }
           : null;
     if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)) });
   }
@@ -197,7 +197,7 @@ function PortraitSegment({
     return <PortraitShot media={{ kind: "video", src, trimBefore: Math.round((segment.clip_offset ?? 0) * fps) }} index={index} fade={ENTER_FRAMES} {...size} />;
   }
   if (segment.type === "screenshot" && image) {
-    return <PortraitShot media={{ kind: "image", src: image }} index={index} fade={ENTER_FRAMES} frames={Math.round(segment.duration * fps)} centred={centred} {...size} />;
+    return <PortraitShot media={{ kind: "image", src: image, crop: segment.crop }} index={index} fade={ENTER_FRAMES} frames={Math.round(segment.duration * fps)} centred={centred} {...size} />;
   }
   if (segment.type === "end_card") return <PortraitEnd brand={brand} text={segment.text} look={look} width={baseWidth} height={baseHeight} />;
   if (segment.type === "text") return <PortraitCard text={segment.text ?? ""} accent={accent} brand={brand} {...size} />;

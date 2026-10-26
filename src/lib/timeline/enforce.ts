@@ -3,9 +3,14 @@ import type { Segment, Timeline } from "./schema";
 
 const EPS = 0.05;
 
-/** On-screen text limits: short enough to read on a phone in one glance. */
+/**
+ * On-screen text limits: short enough to read on a phone in one glance. The planner is asked for 2-5 words (agency
+ * captions); these hard caps only stop a long line, since cutting words off mid-phrase reads worse than one extra.
+ */
 export const MAX_OVERLAY_WORDS = 7;
 export const MAX_OVERLAY_CHARS = 42;
+/** What the planner is asked for. */
+export const CAPTION_WORDS = 5;
 export const MAX_CARD_WORDS = 9;
 /** The opening hook gets a little more room: hooks are written to 8 words and read as one phrase. */
 export const MAX_HOOK_LINE_WORDS = 8;

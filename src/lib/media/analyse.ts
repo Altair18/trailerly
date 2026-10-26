@@ -16,8 +16,12 @@ For every clip give:
   of the frame: {"x": left, "y": top, "w": width, "h": height}, each 0 to 1. Be generous (cover whole lists or
   panels, not single words) and merge overlapping areas. Empty list when personal_info is false.
 - shot: when a shot list is given, the number of the shot this clip films (1-based), or null if none fits.
+- headline_band: only when the image is an App Store marketing screenshot with its own headline or caption text
+  printed outside the app's UI (usually big words above or below a phone or the app screen): {"edge": "top" or
+  "bottom", "h": share of the image height, 0 to 0.6, from that edge down to just past the last line of that text}.
+  null for a plain screen with no marketing text.
 Return JSON: {"clips": [{"clip_id": "...", "label": "...", "feature": ... , "interest": n, "personal_info": bool,
-"privacy_note": ..., "private_regions": [...], "shot": n or null}]}.`;
+"privacy_note": ..., "private_regions": [...], "shot": n or null, "headline_band": ... or null}]}.`;
 
 export const ClipNotesReply = z.object({
   clips: z.array(ClipNotes.extend({ clip_id: z.string() })),

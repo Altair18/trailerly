@@ -13,6 +13,7 @@ import { enforceSpec } from "@/lib/timeline/enforce";
 import { planTimeline } from "@/lib/timeline/plan";
 import { TEMPLATE_SYSTEM, TemplateFill } from "@/lib/timeline/templates";
 import { fallbackTimeline } from "@/lib/timeline/preview";
+import { cropScreenshotHeadlines, doubleHeadlines } from "@/lib/timeline/headlines";
 import { variantHooks, withHook } from "@/lib/timeline/variants";
 import { Timeline } from "@/lib/timeline/schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -65,6 +66,7 @@ export const planTimelines = task({
         if (enforceSpec(timeline, spec, clipSeconds, imageIds).length > 0) {
           timeline = fallbackTimeline(clips, hook, spec, screenshots);
         }
+        timeline = cropScreenshotHeadlines(timeline, screenshots);
         timelines[id] = timeline;
         await db
           .from("outputs")
@@ -83,8 +85,11 @@ export const planTimelines = task({
       );
       if (planned.timeline.template) usedTemplates.push(planned.timeline.template);
       plannedBy[planned.source] += 1;
-      // Never open a shot on a loading screen or a frozen stretch when the clip has better footage after it.
-      const timeline = avoidDeadTime(planned.timeline, clips);
+      // Never open a shot on a loading screen or a frozen stretch when the clip has better footage after it, and
+      // crop store screenshots' own headlines off so our line never sits over a second one.
+      const timeline = cropScreenshotHeadlines(avoidDeadTime(planned.timeline, clips), screenshots);
+      const doubles = doubleHeadlines(timeline, screenshots);
+      if (doubles.length) logger.warn("Double headlines", { packId, spec: id, doubles });
       timelines[id] = timeline;
       await db
         .from("outputs")

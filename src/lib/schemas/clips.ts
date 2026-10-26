@@ -29,6 +29,11 @@ export const ClipNotes = z.object({
   blur_share: z.number().min(0).max(1).optional(),
   /** Which shot of the shot list (1-based) this clip films, when there was a shot list. */
   shot: z.number().int().min(1).nullable().optional(),
+  /**
+   * App Store marketing screenshots only: the strip at the top or bottom that holds the screenshot's own headline,
+   * as a share of the height. The videos crop it off so their own line never sits over a second headline.
+   */
+  headline_band: z.object({ edge: z.enum(["top", "bottom"]), h: z.number() }).nullable().optional(),
 });
 export type ClipNotes = z.infer<typeof ClipNotes>;
 

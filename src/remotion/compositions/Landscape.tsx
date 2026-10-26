@@ -52,13 +52,26 @@ export function columnFont(text: string, col: Box, maxShare: number, perLine = 6
   return Math.round(Math.min(col.height * maxShare, (col.width * perLine) / chars));
 }
 
-export type Media = { kind: "video"; src: string; trimBefore: number } | { kind: "image"; src: string };
+/** Shares of an image cut off its top and bottom (a store screenshot's own headline). */
+export type Crop = { top?: number; bottom?: number };
+
+export type Media = { kind: "video"; src: string; trimBefore: number } | { kind: "image"; src: string; crop?: Crop };
+
+/** Share of the width trimmed off each side with a crop: store screenshots put the phone on a coloured margin. */
+const CROP_SIDE = 0.04;
+
+/** Show only the part of an image between the crops (Chrome's object-view-box), so object-fit works on what's left. */
+export function cropStyle(crop?: Crop): CSSProperties {
+  if (!crop || (!crop.top && !crop.bottom)) return {};
+  const side = `${CROP_SIDE * 100}%`;
+  return { objectViewBox: `inset(${(crop.top ?? 0) * 100}% ${side} ${(crop.bottom ?? 0) * 100}% ${side})` } as CSSProperties;
+}
 
 function MediaFill({ media, style }: { media: Media; style: CSSProperties }) {
   return media.kind === "video" ? (
     <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={style} />
   ) : (
-    <Img src={media.src} style={style} />
+    <Img src={media.src} style={{ ...style, ...cropStyle(media.crop) }} />
   );
 }
 
