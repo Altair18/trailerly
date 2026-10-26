@@ -69,3 +69,21 @@ export function AppIcon({ brand, size }: { brand?: Brand; size: number }) {
     </div>
   );
 }
+
+/** Words rise into place one after another from behind a mask, the way title designers set lines. */
+export function RevealWords({ text, style, highlight = -1, accent, delay = 0 }: { text: string; style: CSSProperties; highlight?: number; accent?: string; delay?: number }) {
+  const frame = useCurrentFrame();
+  const words = text.split(/\s+/).filter(Boolean);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", columnGap: "0.24em", ...style }}>
+      {words.map((w, i) => {
+        const t = interpolate(frame - delay - i * 3, [0, 13], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+        return (
+          <span key={i} style={{ display: "inline-block", overflow: "hidden", paddingBottom: "0.1em", marginBottom: "-0.1em" }}>
+            <span style={{ display: "inline-block", transform: `translateY(${(1 - t) * 105}%)`, color: i === highlight && accent ? accent : undefined }}>{w}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}

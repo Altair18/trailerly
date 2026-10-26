@@ -1,10 +1,11 @@
 import { AbsoluteFill, Easing, Img, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
+import { focusFor, type FocusPoint } from "@/lib/timeline/focus";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
 import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Media, type SafeArea, type SceneShot } from "./Landscape";
-import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
+import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, RevealWords, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
 
 export type { Brand } from "./parts";
 
@@ -25,13 +26,15 @@ export interface TimelineVideoProps extends Record<string, unknown> {
   imageUrls?: Record<string, string>;
   /** Header and search: the centred box every device crop keeps (fractions of the frame). */
   safeArea?: SafeArea;
+  /** clip_id -> where things change on screen over the clip; header and search lean in on it. */
+  clipFocus?: Record<string, FocusPoint[]>;
 }
 
 /** Frames of the crossfade from the end of a looping video back to its first shot. */
 const LOOP_FADE = 15;
 
 
-export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea }: TimelineVideoProps) {
+export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea, clipFocus }: TimelineVideoProps) {
   useBrandFonts();
   const { fps, width, durationInFrames } = useVideoConfig();
   const landscape = baseWidth > baseHeight;
@@ -47,7 +50,7 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
       <div style={{ position: "absolute", left: 0, top: 0, width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: "top left", overflow: "hidden" }}>
         {landscape ? (
           <>
-            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
+            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps, clipFocus)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
             {base.map((seg, i) =>
               seg.type === "text" || seg.type === "end_card" ? (
                 <Sequence key={`c${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
@@ -97,7 +100,13 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
 
 
 /** The landscape stage's shots: every screen or screenshot segment that has media, in order. */
-function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls: Record<string, string>, fps: number): SceneShot[] {
+function sceneShots(
+  base: Segment[],
+  clipUrls: Record<string, string>,
+  imageUrls: Record<string, string>,
+  fps: number,
+  clipFocus: Record<string, FocusPoint[]> = {},
+): SceneShot[] {
   const shots: SceneShot[] = [];
   for (const seg of base) {
     const src = seg.clip_id ? clipUrls[seg.clip_id] : undefined;
@@ -108,7 +117,8 @@ function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls
         : seg.type === "screenshot" && image
           ? { kind: "image", src: image }
           : null;
-    if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)) });
+    const focus = seg.type === "screen" && seg.clip_id ? focusFor(clipFocus[seg.clip_id], seg.clip_offset ?? 0, seg.duration) : null;
+    if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)), focus });
   }
   return shots;
 }
@@ -238,32 +248,32 @@ function HookOverlay({ text, width }: { text: string; width: number }) {
 }
 
 /** What's on screen: a short line in a dark pill in the lower third. */
+/**
+ * A caption in the lower third: plain bold words rising in over a soft shadow, no box. A boxed caption
+ * sliding up looked like an iOS notification banner landing on the screen.
+ */
 function CaptionOverlay({ text, width }: { text: string; width: number }) {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const rise = spring({ frame, fps, config: { damping: 16, stiffness: 150 } });
   const exit = useExit();
-  const pad = Math.round(width * 0.06);
+  const pad = Math.round(width * 0.07);
   return (
-    <AbsoluteFill style={{ padding: pad, paddingBottom: pad * 3, justifyContent: "flex-end", alignItems: "center", opacity: exit }}>
-      <div
-        style={{
-          background: "rgba(10,10,14,.86)",
-          border: `${Math.max(2, Math.round(width * 0.004))}px solid rgba(255,255,255,.12)`,
-          padding: `${pad * 0.35}px ${pad * 0.55}px`,
-          borderRadius: pad * 0.5,
-          maxWidth: "100%",
-          opacity: rise,
-          transform: `translateY(${(1 - rise) * 60}px)`,
-          boxShadow: "0 24px 50px rgba(0,0,0,.5)",
-        }}
-      >
-        <Words text={text} style={{ ...DISPLAY, color: "#F5F4F8", fontSize: fitSize(text, width, 0.085), justifyContent: "center", textAlign: "center" }} />
+    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", opacity: exit }}>
+      <AbsoluteFill style={{ background: "linear-gradient(180deg, transparent 58%, rgba(6,6,10,.55) 82%, rgba(6,6,10,.7))" }} />
+      <div style={{ padding: pad, paddingBottom: pad * 2.6, maxWidth: "100%" }}>
+        <RevealWords
+          text={text}
+          style={{
+            ...DISPLAY,
+            color: "#FFFFFF",
+            fontSize: fitSize(text, width, 0.09),
+            justifyContent: "center",
+            textAlign: "center",
+            textShadow: "0 4px 24px rgba(0,0,0,.55), 0 1px 3px rgba(0,0,0,.5)",
+          }}
+        />
       </div>
     </AbsoluteFill>
   );
 }
-
 
 /** App icon and name over the last seconds of the video. */
 function BrandOverlay({ brand, text, width }: { brand?: Brand; text?: string; width: number }) {

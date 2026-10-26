@@ -1,6 +1,6 @@
 import { AbsoluteFill, Easing, Freeze, Img, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CSSProperties, ReactNode } from "react";
-import { AppIcon, type Brand, DISPLAY, INK, PINK, UI, useEntrance, Words, YEL } from "./parts";
+import { AppIcon, type Brand, DISPLAY, INK, PINK, RevealWords, UI, useEntrance, Words, YEL } from "./parts";
 
 // Header (21:9) and search (3:2) layout. The portrait recording sits in a phone on the right of Apple's safe
 // box, text sits on the left of it, and a blurred copy of the same media fills the rest of the frame.
@@ -128,6 +128,22 @@ export interface SceneShot {
   /** Frames from the start of the video. */
   from: number;
   frames: number;
+  /** Where the action is on the screen (fractions); the hero screen leans in on it. */
+  focus?: { x: number; y: number } | null;
+}
+
+/** How far the hero screen leans in on the action: gently under the hook, more on the beats after it. */
+const ZOOM_FIRST = 1.18;
+const ZOOM = 1.4;
+/** Shots shorter than this play unzoomed: a zoom needs time to land and read. */
+const ZOOM_MIN_FRAMES = 60;
+
+/** Scale over a shot: ease in on the action after the shot settles, hold, and ease back out before the cut. */
+export function zoomAt(frame: number, frames: number, peak: number): number {
+  if (frames < ZOOM_MIN_FRAMES || peak <= 1) return 1;
+  const inT = interpolate(frame, [10, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) });
+  const outT = interpolate(frame, [frames - 16, frames - 2], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) });
+  return 1 + (peak - 1) * Math.min(inT, outT);
 }
 
 /** Frames of the hero screen's crossfade from one shot to the next. */
@@ -136,14 +152,19 @@ const SWAP = 9;
 const GLARE = 16;
 
 /** The hero phone's screen for one shot: settles in over the previous one with a sweep of light (the first shot just shows). */
-function HeroScreen({ media, first }: { media: Media; first: boolean }) {
+function HeroScreen({ media, first, focus, frames }: { media: Media; first: boolean; focus?: { x: number; y: number } | null; frames: number }) {
   const frame = useCurrentFrame();
+  const zoom = focus ? zoomAt(frame, frames, first ? ZOOM_FIRST : ZOOM) : 1;
+  // Zooming about the action keeps that spot where it is and every edge of the screen covered.
+  const origin = focus ? `${Math.round(Math.min(0.9, Math.max(0.1, focus.x)) * 100)}% ${Math.round(Math.min(0.9, Math.max(0.1, focus.y)) * 100)}%` : "50% 50%";
   const t = first ? 1 : interpolate(frame, [0, SWAP], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   const g = interpolate(frame, [0, GLARE], [-0.6, 1.6], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
   return (
     <AbsoluteFill>
       <AbsoluteFill style={{ opacity: t, transform: `scale(${1.05 - 0.05 * t})` }}>
-        <MediaFill media={media} style={FILL} />
+        <AbsoluteFill style={{ transform: `scale(${zoom})`, transformOrigin: origin }}>
+          <MediaFill media={media} style={FILL} />
+        </AbsoluteFill>
       </AbsoluteFill>
       {!first && frame < GLARE && (
         <AbsoluteFill
@@ -255,7 +276,7 @@ export function LandscapeScene({
         >
           {shots.map((s, i) => (
             <Sequence key={`h${i}`} from={s.from} durationInFrames={s.frames}>
-              <HeroScreen media={s.media} first={i === 0} />
+              <HeroScreen media={s.media} first={i === 0} focus={s.focus} frames={s.frames} />
             </Sequence>
           ))}
           {loop && shots.length > 1 && durationInFrames > 60 && (
@@ -299,24 +320,6 @@ export function keyWord(text: string): number {
     }
   });
   return best;
-}
-
-/** Words rise into place one after another from behind a mask, the way title designers set lines. */
-function RevealWords({ text, style, highlight = -1, accent, delay = 0 }: { text: string; style: CSSProperties; highlight?: number; accent?: string; delay?: number }) {
-  const frame = useCurrentFrame();
-  const words = text.split(/\s+/).filter(Boolean);
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", columnGap: "0.24em", ...style }}>
-      {words.map((w, i) => {
-        const t = interpolate(frame - delay - i * 3, [0, 13], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
-        return (
-          <span key={i} style={{ display: "inline-block", overflow: "hidden", paddingBottom: "0.1em", marginBottom: "-0.1em" }}>
-            <span style={{ display: "inline-block", transform: `translateY(${(1 - t) * 105}%)`, color: i === highlight && accent ? accent : undefined }}>{w}</span>
-          </span>
-        );
-      })}
-    </div>
-  );
 }
 
 /** Ease the whole block up and out over the last frames of an overlay. */

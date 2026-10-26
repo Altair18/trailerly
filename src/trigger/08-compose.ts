@@ -30,6 +30,7 @@ export const compose = task({
     const clips = await readyClips(packId);
     const urls = await signedUrls(clips.map((c) => c.path), 6 * 3600);
     const clipUrls = Object.fromEntries(clips.map((c) => [c.id, urls[c.path]!]));
+    const clipFocus = Object.fromEntries(clips.flatMap((c) => (c.focus ? [[c.id, c.focus]] : [])));
     const listing = Listing.safeParse(app.listing_json);
     const imageUrls = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
 
@@ -55,6 +56,7 @@ export const compose = task({
             baseHeight: spec.height,
             safeArea: spec.safeArea,
             brand,
+            clipFocus,
             scale: DRAFT_SCALE,
           };
           await renderOutput({
