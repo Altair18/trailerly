@@ -162,8 +162,10 @@ export interface FillContext {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const BRAND_MIN = 2;
-/** A still screenshot holds attention for a few seconds at most. */
-const SCREENSHOT_MAX = 5;
+/** A still screenshot holds attention for a few seconds at most (top apps' previews cut every 3-4 s). */
+const SCREENSHOT_MAX = 3.5;
+/** A closing card that only shows the app's name and a line. */
+const CLOSE_MAX = 3;
 
 /** A caption that fits the on-screen limits: a few words, cut at a natural break, never over the character cap. */
 export function tidyCaption(text: string): string {
@@ -209,19 +211,22 @@ export function buildFromTemplate(
   const useEndCard = template.endCard && spec.allowedSegments.includes("end_card") && !!fill.cta?.trim();
   const cta = useEndCard ? tidyCaption(fill.cta!) : "";
 
+  // Stills never hold past a few seconds, unless the video would come out under the spec's minimum.
+  const stillBeats = template.beats.length - (useEndCard ? 1 : 0);
+  const stillMax = Math.max(SCREENSHOT_MAX, (spec.minSeconds + 0.5 - (useEndCard ? CLOSE_MAX : 0)) / stillBeats);
   // Length each beat can have, and the least it needs to read its text.
   const slots = template.beats.map((b, i) => {
     const f = fill.beats[i]!;
     const clip = clips.get(f.source);
     const offset = clip ? Math.min(f.offset ?? 0, Math.max(0, clip.duration - 0.5)) : 0;
-    const available = clip ? clip.duration - offset : SCREENSHOT_MAX;
+    const available = clip ? clip.duration - offset : stillMax;
     const text = i === 0 ? opening : b.role === "close" ? cta : captions[i]!;
     const least = Math.max(b.role === "close" ? BRAND_MIN : 1.2, text ? readSeconds(text) : 0);
     const isLastCard = b.role === "close" && useEndCard;
     if (!isLastCard && !clip && !shots.has(f.source)) errors.push(`Beat ${i + 1}: unknown clip or screenshot "${f.source}".`);
     if (!clip && shots.has(f.source) && !canScreenshot) errors.push(`Beat ${i + 1}: ${spec.label} can't use screenshots.`);
     // Landscape beats never hold past the pacing limits; if the clips run short the video is a little shorter.
-    const cap = isLandscape(spec) ? (b.role === "close" ? MAX_OUTRO_SECONDS : MAX_BEAT_SECONDS) : Infinity;
+    const cap = isLandscape(spec) ? (b.role === "close" ? MAX_OUTRO_SECONDS : MAX_BEAT_SECONDS) : isLastCard ? CLOSE_MAX : Infinity;
     return { beat: b, source: f.source, clip, offset, available: Math.min(isLastCard ? Infinity : available, Math.max(cap, least)), want: (b.weight / weightSum) * total, least };
   });
   if (errors.length) return { timeline: null, errors };
