@@ -1,4 +1,4 @@
-import { AbsoluteFill, Easing, Freeze, Img, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Easing, Img, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CSSProperties, ReactNode } from "react";
 import { AppIcon, type Brand, DISPLAY, INK, PINK, RevealWords, UI, useEntrance, Words, YEL } from "./parts";
 
@@ -44,22 +44,6 @@ export function textBox(box: Box, phone: Box): Box {
   const left = box.left + Math.round(box.width * 0.04);
   const top = box.top + Math.round(box.height * 0.08);
   return { left, top, width: Math.max(0, phone.left - gap - left), height: Math.round(box.height * 0.84) };
-}
-
-/**
- * Decorative phones outside the safe box, so the full-width frame on iPad and Mac reads as a row of screens
- * instead of empty space. They step out from the hero phone and the text column until they leave the frame;
- * devices that crop to the safe box never show them.
- */
-export function flankBoxes(box: Box, phone: Box, width: number): (Box & { side: -1 | 1; step: number })[] {
-  const h = Math.round(phone.height * 0.8);
-  const w = Math.round(h * SCREEN_ASPECT);
-  const gap = Math.round(phone.width * 0.3);
-  const top = (step: number) => Math.round(phone.top + (phone.height - h) / 2 + (step % 2 ? -1 : 1) * phone.height * 0.05);
-  const out: (Box & { side: -1 | 1; step: number })[] = [];
-  for (let step = 1, x = phone.left + phone.width + gap; x < width; step++, x += w + gap) out.push({ left: x, top: top(step), width: w, height: h, side: 1, step });
-  for (let step = 1, x = box.left - gap - w; x + w > 0; step++, x -= w + gap) out.push({ left: x, top: top(step), width: w, height: h, side: -1, step });
-  return out;
 }
 
 /** Font size that fits a line into the text column in about three lines. */
@@ -166,7 +150,7 @@ export function withAlpha(hex: string, alpha: number): string {
 /**
  * Header (21:9) and search (3:2) stage, held for the whole video: a dark backdrop lit in the app's own colour,
  * the hero phone on the right of Apple's safe box, turned a little towards the words, with each shot cut into
- * its screen, and a row of quieter phones beyond the safe box showing the other shots. Nothing re-enters
+ * its screen. One phone and a quiet backdrop: copies of the phone around it read as a stock template. Nothing re-enters
  * between shots, so the cut reads as one product moment, and every motion runs one full cycle over the video so
  * a looping header has nothing to jump.
  */
@@ -190,64 +174,35 @@ export function LandscapeScene({
   const box = safeBox(width, height, safe);
   const phone = phoneBox(box, height);
   const col = textBox(box, phone);
-  const flanks = flankBoxes(box, phone, width);
   const phase = (frame / Math.max(1, durationInFrames)) * Math.PI * 2;
   const sway = Math.sin(phase);
   const lift = Math.cos(phase);
-  const glow = phone.height * 1.4;
   const cx = phone.left + phone.width / 2;
   const cy = phone.top + phone.height / 2;
 
   return (
     <AbsoluteFill style={{ backgroundColor: INK, overflow: "hidden" }}>
+      {/* One soft pool of the app's colour behind the phone and a darker floor: lit, not glowing. */}
       <AbsoluteFill
         style={{
           background: [
-            `radial-gradient(${glow * 0.75}px ${glow * 0.6}px at ${cx}px ${cy}px, ${withAlpha(accent, 0.34)}, transparent)`,
-            `radial-gradient(${col.width * 0.9}px ${col.height * 0.9}px at ${col.left + col.width * 0.3}px ${col.top + col.height * 0.5}px, ${withAlpha(accent, 0.1)}, transparent)`,
-            `linear-gradient(180deg, ${withAlpha(accent, 0.05)}, transparent 40%, rgba(0,0,0,.35))`,
+            `radial-gradient(${phone.height * 0.75}px ${phone.height * 0.6}px at ${cx}px ${cy}px, ${withAlpha(accent, 0.13)}, transparent)`,
+            `linear-gradient(180deg, rgba(255,255,255,.035), transparent 45%, rgba(0,0,0,.4))`,
           ].join(", "),
         }}
       />
-      {shots.map((s, i) => (
-        <Sequence key={`g${i}`} from={s.from} durationInFrames={s.frames + (i < shots.length - 1 ? SWAP : 0)} layout="none">
-          <AbsoluteFill style={{ opacity: 0.22 }}>
-            <div
-              style={{
-                position: "absolute",
-                left: cx - glow * 0.6,
-                top: cy - glow / 2,
-                width: glow * 1.2,
-                height: glow,
-                filter: `blur(${Math.round(height * 0.07)}px) saturate(2.4)`,
-                WebkitMaskImage: "radial-gradient(closest-side, #000 35%, transparent)",
-              }}
-            >
-              <MediaFill media={s.media} style={FILL} />
-            </div>
-          </AbsoluteFill>
-        </Sequence>
-      ))}
+      <div
+        style={{
+          position: "absolute",
+          left: cx - phone.width * 0.7,
+          top: phone.top + phone.height * 0.93,
+          width: phone.width * 1.4,
+          height: phone.height * 0.12,
+          background: "radial-gradient(closest-side, rgba(0,0,0,.55), transparent)",
+          filter: `blur(${Math.round(height * 0.012)}px)`,
+        }}
+      />
       <AbsoluteFill style={{ perspective: Math.round(height * 2.4) }}>
-        {flanks.map((f, i) => {
-          const shot = shots.length > 1 ? shots[(i + 1) % shots.length]! : shots[0];
-          if (!shot) return null;
-          const far = Math.min(1, (f.step - 1) / 2);
-          const drift = sway * phone.width * 0.05 * f.side;
-          return (
-            <Phone
-              key={`f${i}`}
-              box={{ ...f, left: f.left + drift }}
-              height={height}
-              style={{ filter: `brightness(${0.4 - far * 0.12}) saturate(0.85)`, transform: `rotateY(${f.side * -16}deg)` }}
-            >
-              {/* A still a second into the shot: moving side phones would pull the eye off the hero. */}
-              <Freeze frame={30}>
-                <MediaFill media={shot.media} style={FILL} />
-              </Freeze>
-            </Phone>
-          );
-        })}
         <Phone
           box={{ ...phone, top: phone.top + lift * phone.height * 0.012 }}
           height={height}
