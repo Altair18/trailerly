@@ -156,7 +156,9 @@ export function Hero() {
       </div>
       <SideReels />
       {/* Spotify-style hover: the card tilts toward the pointer, with a soft glare that follows it. */}
-      <div ref={tilt} className="lp-tilt" onPointerMove={onTiltMove} onPointerLeave={onTiltLeave}>
+      {/* The zone never moves, so the pointer can't slip off the card as it leans (that caused jumping). */}
+      <div className="lp-tilt-zone" onPointerMove={onTiltMove} onPointerLeave={onTiltLeave}>
+      <div ref={tilt} className="lp-tilt">
         <div
           key={i}
           className="lp-tile lp-hero lp-fade"
@@ -193,6 +195,7 @@ export function Hero() {
           </div>
         </div>
         <div className="lp-glare" aria-hidden="true" />
+      </div>
       </div>
       <div className="lp-ctrl">
         <button type="button" className="lp-arrow" aria-label="Previous slide" onClick={() => go(i - 1)}>

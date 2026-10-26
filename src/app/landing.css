@@ -208,7 +208,7 @@
 /* Hero aura: the slide's colours glow out into the black around the hero. */
 .lp-main { overflow-x: clip; }
 .lp-hero-wrap { position: relative; isolation: isolate; }
-.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-tilt, .lp-hero-wrap > .lp-ctrl { position: relative; z-index: 1; }
+.lp-hero-wrap > .lp-tile, .lp-hero-wrap > .lp-tilt-zone, .lp-hero-wrap > .lp-ctrl { position: relative; z-index: 1; }
 /* Hero hover tilt (values come from Hero.tsx): a gentle 3D lean toward the pointer, the phones drift a little
    further for depth, and a soft glare follows the pointer. */
 .lp-tilt { --tx: 0; --ty: 0; --glare: 0; border-radius: 26px; transform: perspective(1400px) rotateX(calc(var(--ty) * -5deg)) rotateY(calc(var(--tx) * 6deg)) translate3d(calc(var(--tx) * 8px), calc(var(--ty) * 8px), 0) scale(calc(1 + var(--glare) * 0.008)); transform-style: preserve-3d; will-change: transform; }
