@@ -1,0 +1,75 @@
+{
+ "segments": [
+  {
+   "type": "screenshot",
+   "start": 0,
+   "duration": 3.5,
+   "image_id": "shot_1"
+  },
+  {
+   "type": "screenshot",
+   "start": 3.5,
+   "duration": 3.5,
+   "image_id": "shot_2"
+  },
+  {
+   "type": "screenshot",
+   "start": 7,
+   "duration": 3.5,
+   "image_id": "shot_5"
+  },
+  {
+   "type": "screenshot",
+   "start": 10.5,
+   "duration": 3.5,
+   "image_id": "shot_3"
+  },
+  {
+   "type": "screenshot",
+   "start": 14,
+   "duration": 3.5,
+   "image_id": "shot_4"
+  },
+  {
+   "text": "Ready to unlock your next booster?",
+   "type": "text",
+   "start": 0,
+   "style": "hook",
+   "overlay": true,
+   "duration": 3.5
+  },
+  {
+   "text": "Clear tiles past fun obstacles",
+   "type": "text",
+   "start": 3.5,
+   "style": "caption",
+   "overlay": true,
+   "duration": 3.5
+  },
+  {
+   "text": "Open chests for powerful boosters",
+   "type": "text",
+   "start": 7,
+   "style": "caption",
+   "overlay": true,
+   "duration": 3.5
+  },
+  {
+   "text": "Restore the castle's rooms and gardens",
+   "type": "text",
+   "start": 10.5,
+   "style": "caption",
+   "overlay": true,
+   "duration": 3.5
+  },
+  {
+   "type": "text",
+   "start": 14,
+   "style": "brand",
+   "overlay": true,
+   "duration": 3.5
+  }
+ ],
+ "template": "promise-tour",
+ "planned_by": "fast"
+}
