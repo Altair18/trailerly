@@ -48,6 +48,8 @@ export function Drafts({ packId }: { packId: string }) {
 
   const finals = outputs.flatMap((o) => o.finals);
   const problem = pack ? checkoutProblem(pack.status, outputs, expected) : null;
+  // Back from Stripe before its webhook lands: say so, and don't offer the pay button a second time.
+  const confirming = pack?.status === "draft" && justPaid();
 
   async function pay() {
     setPaying(true);
@@ -223,10 +225,10 @@ export function Drafts({ packId }: { packId: string }) {
 
         <div className="actionbar">
           <span style={{ flex: "1 1 260px" }}>
-            {pack && <ActionText status={pack.status} drafting={ready < expected.length} problem={problem} checkout={pack.checkout} error={payError} />}
+            {pack && <ActionText status={pack.status} drafting={ready < expected.length} problem={problem} checkout={pack.checkout} error={payError} confirming={confirming} />}
           </span>
           {pack?.status === "draft" && <Link className="btn btn-ghost" href={`/packs/${packId}`}>Back to hooks</Link>}
-          {pack?.status === "draft" && pack.checkout && !problem && (
+          {pack?.status === "draft" && pack.checkout && !problem && !confirming && (
             <button className="btn btn-light" type="button" onClick={pay} disabled={paying}>
               {paying ? "Opening checkout…" : `Pay${PRICES.launch ? ` ${PRICES.launch}` : ""} and download`}
             </button>
@@ -243,13 +245,15 @@ export function Drafts({ packId }: { packId: string }) {
   );
 }
 
-function ActionText({ status, drafting, problem, checkout, error }: {
+function ActionText({ status, drafting, problem, checkout, error, confirming }: {
   status: PackState["status"];
   drafting: boolean;
   problem: string | null;
   checkout: boolean;
   error: string | null;
+  confirming: boolean;
 }) {
+  if (confirming) return <><span className="spinner" aria-hidden="true" /> <b>Confirming your payment…</b></>;
   if (error) return <b style={{ color: "var(--coral)" }}>{error}</b>;
   if (finalsBusy(status)) {
     return (
