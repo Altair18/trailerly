@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 // A bearded dragon that visits now and then. It walks in from the side, climbs onto a card you can see
 // (or a quiet bit of the page), turns, and lies flat to bask: eyes half shut, the odd head bob with its
@@ -44,35 +44,46 @@ const mix = (a: string, b: string, t: number) => {
 // Spine: 26 joints, snout to tail tip. Wide spade head, broad flat body, long thin tail.
 const N = 26;
 const SEG = 5.2;
-const HW = [2.4, 5.4, 7.6, 8.4, 6.2, 7.6, 10.0, 11.4, 12.0, 12.0, 11.6, 10.6, 8.8, 6.4, 5.4, 4.7, 4.1, 3.6, 3.1, 2.7, 2.3, 1.9, 1.5, 1.1, 0.8, 0.5];
+const HW = [3.0, 5.6, 7.6, 9.2, 9.0, 7.4, 10.6, 12.6, 13.6, 13.8, 13.4, 12.2, 10.0, 7.2, 6.0, 5.1, 4.4, 3.8, 3.3, 2.8, 2.4, 2.0, 1.6, 1.2, 0.85, 0.5];
 // Most a joint may bend relative to the one in front (radians): stiff body, loose tail.
-const BEND = [0, 0, 0.1, 0.18, 0.26, 0.18, 0.1, 0.08, 0.08, 0.08, 0.1, 0.12, 0.18, 0.24, 0.28, 0.3, 0.3, 0.32, 0.32, 0.34, 0.34, 0.36, 0.36, 0.38, 0.38, 0.38];
-const FRONT = 6;
+const BEND = [0, 0, 0.08, 0.14, 0.2, 0.24, 0.14, 0.08, 0.08, 0.08, 0.1, 0.12, 0.18, 0.24, 0.28, 0.3, 0.3, 0.32, 0.32, 0.34, 0.34, 0.36, 0.36, 0.38, 0.38, 0.38];
+const FRONT = 7;
 const HIND = 12;
 const LIMB = 10;
 const VIEW = 600; // size of the moving SVG window around the dragon
 
-// Back pattern, fixed so it never shimmers: [joint + fraction, offset across the body -1..1, radius].
-const BLOTCHES: [number, number, number][] = (() => {
+// Markings, fixed so they never shimmer: [joint + fraction, offset across the body -1..1, radius, kind].
+// kind 0: pale dorsal blotch, 1: dark flank mark, 2: pale tubercle (raised scale), 3: dark tubercle.
+const MARKS: [number, number, number, number][] = (() => {
   let seed = 11;
   const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  const out: [number, number, number][] = [];
-  for (let j = 5.6; j < 12.6; j += 1.1) for (const s of [1, -1]) out.push([j + rnd() * 0.3, s * (0.42 + rnd() * 0.12), 1.7 + rnd() * 0.8]);
-  for (let k = 0; k < 26; k++) out.push([2 + rnd() * 10.5, (rnd() * 2 - 1) * 0.8, 0.5 + rnd() * 0.5]);
+  const out: [number, number, number, number][] = [];
+  for (let j = 6; j < 12.8; j += 1.15) {
+    for (const s of [1, -1]) {
+      out.push([j + rnd() * 0.25, s * (0.2 + rnd() * 0.06), 1.3 + rnd() * 0.4, 0]);
+      out.push([j + 0.5 + rnd() * 0.2, s * (0.55 + rnd() * 0.1), 1.5 + rnd() * 0.5, 1]);
+    }
+  }
+  for (let k = 0; k < 150; k++) {
+    const at = 2.2 + rnd() * 11;
+    out.push([at, (rnd() * 2 - 1) * 0.92, 0.35 + rnd() * 0.4, rnd() < 0.62 ? 2 : 3]);
+  }
+  // Rows of spiky scales along the flanks.
+  for (let j = 6; j < 12.6; j += 0.42) for (const s of [1, -1]) out.push([j, s * 0.8, 0.55, 3]);
   return out;
 })();
 
 const C = {
-  body: "#D9A15A",
-  head: "#E7A14C",
-  limb: "#D49A55",
-  edge: "#7A4E22",
-  pattern: "#8E5A2A",
-  ridge: "#F4D3A0",
-  spike: "#C48743",
-  beard: "#8A5A2B",
+  base: "#C89A63",
+  head: "#D29A57",
+  limb: "#C3955F",
+  dark: "#3E2A17",
+  flank: "#6E4A2A",
+  pale: "#EAD3A6",
+  spike: "#9A6B3C",
+  beard: "#9C6B3A",
   beardDark: "#22140A",
-  eye: "#1A120A",
+  eye: "#17100A",
 };
 
 function circle(p: V, rad: number) {
@@ -120,6 +131,7 @@ function cardSpot(layer: HTMLElement, S: number): V | null {
 export function Dragon() {
   const el = useRef<HTMLDivElement>(null);
   const flee = useRef<() => void>(() => {});
+  const clipId = `dragon-clip-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -128,15 +140,24 @@ export function Dragon() {
     if (!node || !layer) return;
     const $ = (c: string) => node.querySelector(`.${c}`) as SVGElement;
     const parts = {
-      limbs: [0, 1, 2, 3].map((k) => $(`limb${k}`)),
+      limbEdgeU: $("limbEdgeU"),
+      limbEdgeL: $("limbEdgeL"),
+      limbU: $("limbU"),
+      limbL: $("limbL"),
+      toes: $("toes"),
       claws: $("claws"),
       spikes: $("spikes"),
       beard: $("beard"),
       body: $("body"),
+      clip: $("clip"),
       head: $("headtint"),
-      ridge: $("ridge"),
-      pattern: $("pattern"),
+      marks: [0, 1, 2, 3].map((k) => $(`mark${k}`)),
       bands: $("bands"),
+      light: [0, 1, 2].map((k) => $(`light${k}`)),
+      shade: [0, 1, 2].map((k) => $(`shade${k}`)),
+      edge: $("edge"),
+      brow: $("brow"),
+      lids: $("lids"),
       eyes: $("eyes"),
       glint: $("glint"),
       nose: $("nose"),
@@ -264,7 +285,7 @@ export function Dragon() {
       const q = p.map((v) => ({ ...v }));
       const sinceBob = t - bobAt;
       const bob = sinceBob > 0 && sinceBob < 1.3 ? Math.abs(Math.sin(sinceBob * Math.PI * 2.4)) : 0;
-      for (let i = 0; i < 4; i++) q[i] = add(p[4]!, rot(sub(p[i]!, p[4]!), yaw), 1 + bob * 0.09);
+      for (let i = 0; i < 5; i++) q[i] = add(p[5]!, rot(sub(p[i]!, p[5]!), yaw), 1 + bob * 0.08);
       let acc = 0;
       for (let i = 14; i < N; i++) {
         acc += Math.sin(t * 0.9 - (i - 14) * 0.5) * 0.02 * (walking ? 0 : 1) + flat * curl * 0.075;
@@ -273,10 +294,20 @@ export function Dragon() {
 
       const c = q[9]!;
       const o = (v: V) => ({ x: v.x - c.x + VIEW / 2, y: v.y - c.y + VIEW / 2 });
+      const P = (v: V) => `${f1(o(v).x)} ${f1(o(v).y)}`;
       node!.style.transform = `translate(${f1(c.x - VIEW / 2)}px, ${f1(c.y - VIEW / 2)}px)`;
+      const wAt = (i: number, fr = 0) => {
+        const w = widthAt(i) + (widthAt(Math.min(N - 1, i + 1)) - widthAt(i)) * fr;
+        return i < 5 ? w * (1 + bob * 0.08) : w;
+      };
+      const at = (j: number, u: number) => {
+        const i = Math.min(N - 2, Math.floor(j));
+        const fr = j - i;
+        return add(lerp(q[i]!, q[i + 1]!, fr), frameAt(q, i).n, u * wAt(i, fr));
+      };
 
-      // Legs and claws, drawn under the body.
-      let claws = "";
+      // Legs: a tapered upper limb and forearm, outlined, then the foot with five long clawed toes.
+      let upperD = "", lowerD = "", toesD = "", clawD = "";
       feet.forEach((ft, k) => {
         const a = anchor(k, q);
         const u = LIMB * S;
@@ -304,101 +335,109 @@ export function Dragon() {
         const dot = (e: V) => (e.x - a.x) * f.x + (e.y - a.y) * f.y;
         // Front elbows point back, hind knees point forward, as in real lizards.
         const elbow = k < 2 ? (dot(e1) < dot(e2) ? e1 : e2) : dot(e1) > dot(e2) ? e1 : e2;
-        const A = o(a);
-        const E = o(elbow);
-        const F = o(foot);
-        parts.limbs[k]!.setAttribute("d", `M${f1(A.x)} ${f1(A.y)}L${f1(E.x)} ${f1(E.y)}L${f1(F.x)} ${f1(F.y)}`);
-        parts.limbs[k]!.setAttribute("stroke-width", ((5.2 + lift * 0.9) * S).toFixed(2));
+        upperD += `M${P(a)}L${P(elbow)}`;
+        lowerD += `M${P(elbow)}L${P(foot)}`;
         const fd = unit(sub(foot, elbow));
-        [-1.0, -0.5, 0, 0.5, 0.95].forEach((sp, m) => {
-          const tl = [2.6, 3.6, 4.2, 3.7, 2.8][m]! * S * (1 + lift * 0.2);
-          const tip = add(F, rot(fd, sp * (k % 2 ? -1 : 1)), tl);
-          claws += `M${f1(F.x)} ${f1(F.y)}L${f1(tip.x)} ${f1(tip.y)}`;
+        const toeLen = (k < 2 ? [3.0, 4.2, 5.0, 4.4, 2.8] : [3.2, 4.6, 5.8, 5.0, 3.6]).map((v) => v * S * (1 + lift * 0.15));
+        [-1.05, -0.5, 0, 0.45, 0.95].forEach((sp, m) => {
+          const dir = rot(fd, sp * (k % 2 ? -1 : 1));
+          const mid = add(foot, dir, toeLen[m]! * 0.55);
+          const tip = add(add(foot, dir, toeLen[m]!), rot(dir, Math.PI / 2), 0.4 * S * (k % 2 ? -1 : 1));
+          toesD += `M${P(foot)}Q${P(mid)} ${P(tip)}`;
+          clawD += `M${P(tip)}L${P(add(tip, dir, 1.3 * S))}`;
         });
       });
-      parts.claws.setAttribute("d", claws);
-      parts.claws.setAttribute("stroke-width", (1.5 * S).toFixed(2));
+      parts.limbEdgeU.setAttribute("d", upperD);
+      parts.limbEdgeL.setAttribute("d", lowerD);
+      parts.limbU.setAttribute("d", upperD);
+      parts.limbL.setAttribute("d", lowerD);
+      parts.limbEdgeU.setAttribute("stroke-width", (6.6 * S).toFixed(2));
+      parts.limbU.setAttribute("stroke-width", (5.3 * S).toFixed(2));
+      parts.limbEdgeL.setAttribute("stroke-width", (5.6 * S).toFixed(2));
+      parts.limbL.setAttribute("stroke-width", (4.3 * S).toFixed(2));
+      parts.toes.setAttribute("d", toesD);
+      parts.toes.setAttribute("stroke-width", (1.5 * S).toFixed(2));
+      parts.claws.setAttribute("d", clawD);
+      parts.claws.setAttribute("stroke-width", (0.9 * S).toFixed(2));
 
       // Body outline around the spine.
       const L: V[] = [];
       const R: V[] = [];
       for (let i = 0; i < N; i++) {
         const { n } = frameAt(q, i);
-        const w = widthAt(i) * (i < 4 ? 1 + bob * 0.09 : 1);
-        L.push(o(add(q[i]!, n, w)));
-        R.unshift(o(add(q[i]!, n, -w)));
+        L.push(o(add(q[i]!, n, wAt(i))));
+        R.unshift(o(add(q[i]!, n, -wAt(i))));
       }
       const { f: f0, n: n0 } = frameAt(q, 0);
-      const snout = o(add(q[0]!, f0, 3 * S));
+      const snout = o(add(q[0]!, f0, 1.4 * S));
       const tip = o(add(q[N - 1]!, frameAt(q, N - 1).f, -2 * S));
       const outline = smooth([snout, ...L, tip, ...R]);
-      parts.body.setAttribute("d", outline);
-      parts.body.setAttribute("stroke-width", (0.9 * S).toFixed(2));
-      parts.hit.setAttribute("d", outline);
-      parts.head.setAttribute("d", smooth([snout, ...L.slice(0, 5), o(q[5]!), ...R.slice(N - 5)]));
+      for (const el of [parts.body, parts.clip, parts.hit, parts.edge, ...parts.shade]) el.setAttribute("d", outline);
+      parts.edge.setAttribute("stroke-width", (0.8 * S).toFixed(2));
+      // Rounded look: dark strokes along the inside of the outline, wide and faint to narrow and darker.
+      [13, 8, 4].forEach((w, k) => parts.shade[k]!.setAttribute("stroke-width", (w * S).toFixed(2)));
 
-      // Spiky fringe down each side of the body, little spikes behind the head, and the beard under the jaw.
+      // Spine highlight, with a soft falloff.
+      let ridge = "";
+      for (let i = 1; i < 21; i++) ridge += `${i === 1 ? "M" : "L"}${P(q[i]!)}`;
+      parts.light.forEach((el, k) => {
+        el.setAttribute("d", ridge);
+        el.setAttribute("stroke-width", ([11, 6.5, 3][k]! * S).toFixed(2));
+      });
+
+      // Head: warmer tone over the skull, brow ridges, and spiky jowls at the back corners.
+      parts.head.setAttribute("d", smooth([snout, ...L.slice(0, 5), o(q[5]!), ...R.slice(N - 5)]));
       let spikes = "";
       let beard = "";
-      const spike = (i: number, fr: number, s: number, l: number, w: number) => {
-        const base = lerp(q[i]!, q[i + 1]!, fr);
+      const spike = (j: number, s: number, l: number, w: number, rake = 0.5) => {
+        const i = Math.min(N - 2, Math.floor(j));
         const { f, n } = frameAt(q, i);
-        const at = add(base, n, s * (widthAt(i) + (widthAt(i + 1) - widthAt(i)) * fr) * 0.96);
-        const tp = add(add(at, n, s * l), f, -l * 0.45);
-        const b1 = add(at, f, w);
-        const b2 = add(at, f, -w);
-        return `M${f1(o(b1).x)} ${f1(o(b1).y)}L${f1(o(tp).x)} ${f1(o(tp).y)}L${f1(o(b2).x)} ${f1(o(b2).y)}Z`;
+        const base = at(j, s * 0.94);
+        const tp = add(add(base, n, s * l), f, -l * rake);
+        return `M${P(add(base, f, w))}L${P(tp)}L${P(add(base, f, -w))}Z`;
       };
       for (const s of [1, -1]) {
-        for (let j = 5; j < 13; j += 0.5) spikes += spike(Math.floor(j), j % 1, s, (2.6 + flat * 0.8) * S, 1.3 * S);
-        spikes += spike(2, 0.6, s, 2.6 * S, 1.1 * S);
-        for (let j = 3; j < 5; j += 0.34) beard += spike(Math.floor(j), j % 1, s, (3.6 + puff * 2.6) * S, 1.2 * S);
+        // Soft fringe of small spines down each flank.
+        for (let j = 6.2; j < 12.6; j += 0.3) spikes += spike(j, s, (2.3 + flat * 0.6 + ((j * 7) % 1) * 0.8) * S, 0.85 * S, 0.7);
+        // Jowl spikes at the back of the head, and the beard under the jaw, which puffs out and darkens.
+        for (let j = 3.2; j < 4.6; j += 0.28) spikes += spike(j, s, 3.2 * S, 1 * S, 0.9);
+        for (let j = 3.6; j < 5.4; j += 0.22) beard += spike(j, s, (2.2 + puff * 2.8) * S, 0.95 * S, 0.8);
       }
       parts.spikes.setAttribute("d", spikes);
       parts.beard.setAttribute("d", beard);
       parts.beard.setAttribute("fill", mix(C.beard, C.beardDark, puff));
 
-      let ridge = "";
-      for (let i = 3; i < 20; i++) {
-        const v = o(q[i]!);
-        ridge += `${i === 3 ? "M" : "L"}${f1(v.x)} ${f1(v.y)}`;
-      }
-      parts.ridge.setAttribute("d", ridge);
-      parts.ridge.setAttribute("stroke-width", (3.2 * S).toFixed(2));
-
-      let pattern = "";
-      for (const [at, u, rad] of BLOTCHES) {
-        const i = Math.floor(at);
-        const fr = at - i;
-        const w = widthAt(i) + (widthAt(i + 1) - widthAt(i)) * fr;
-        pattern += circle(o(add(lerp(q[i]!, q[i + 1]!, fr), frameAt(q, i).n, u * w)), rad * S);
-      }
-      parts.pattern.setAttribute("d", pattern);
-
+      // Markings and scale texture, all attached to the spine so they move with the body.
+      const marks: string[] = ["", "", "", ""];
+      for (const [j, u, rad, kind] of MARKS) marks[kind] += circle(o(at(j, u)), rad * S);
+      parts.marks.forEach((el, k) => el.setAttribute("d", marks[k]!));
       let bands = "";
-      for (let i = 14; i < N - 1; i += 2) {
-        const { n } = frameAt(q, i);
-        const a = o(add(q[i]!, n, widthAt(i) * 0.9));
-        const b = o(add(q[i]!, n, -widthAt(i) * 0.9));
-        bands += `M${f1(a.x)} ${f1(a.y)}L${f1(b.x)} ${f1(b.y)}`;
+      for (let i = 13; i < N - 1; i += 1.6) {
+        const a = at(i, 1);
+        const b = at(i, -1);
+        bands += `M${P(a)}L${P(b)}`;
       }
       parts.bands.setAttribute("d", bands);
-      parts.bands.setAttribute("stroke-width", (2 * S).toFixed(2));
+      parts.bands.setAttribute("stroke-width", (2.6 * S).toFixed(2));
 
-      // Eyes on the sides of the head; basking narrows them, a blink shuts them.
+      // Eyes on the sides of the head under a brow ridge; basking narrows them, a blink shuts them.
       const { f: fh, n: nh } = frameAt(q, 2);
       const blinking = t > blinkAt && t < blinkAt + 0.16;
-      const open = blinking ? 0.12 : 1 - sleep * 0.78;
-      let eyes = "";
-      let glint = "";
+      const open = blinking ? 0.1 : 1 - sleep * 0.8;
+      let eyes = "", lids = "", glint = "", brow = "";
       for (const s of [1, -1]) {
-        const ec = o(add(add(q[2]!, nh, s * widthAt(2) * 0.7), fh, 1 * S));
-        eyes += circle(ec, 2.1 * S * open);
-        if (open > 0.5) glint += circle(add(ec, fh, 0.8 * S), 0.55 * S);
+        const ec = o(add(at(2.2, s * 0.72), fh, 0.4 * S));
+        lids += circle(ec, 2.4 * S);
+        eyes += circle(ec, 1.7 * S * open);
+        if (open > 0.5) glint += circle(add(ec, fh, 0.6 * S), 0.45 * S);
+        brow += `M${P(at(1.4, s * 0.86))}Q${P(at(2.2, s * 1.08))} ${P(at(3.1, s * 0.92))}`;
       }
+      parts.lids.setAttribute("d", lids);
       parts.eyes.setAttribute("d", eyes);
       parts.glint.setAttribute("d", glint);
-      parts.nose.setAttribute("d", [1, -1].map((s) => circle(o(add(add(q[0]!, n0, s * 1.4 * S), f0, 1.6 * S)), 0.45 * S)).join(""));
+      parts.brow.setAttribute("d", brow);
+      parts.brow.setAttribute("stroke-width", (1.3 * S).toFixed(2));
+      parts.nose.setAttribute("d", [1, -1].map((s) => circle(o(add(add(q[0]!, n0, s * 1.3 * S), f0, 1.2 * S)), 0.4 * S)).join(""));
     }
 
     function frame(now: number) {
@@ -538,20 +577,40 @@ export function Dragon() {
     <div className="lp-dragon-layer" aria-hidden="true">
       <div ref={el} className="lp-dragon">
         <svg viewBox={`0 0 ${VIEW} ${VIEW}`} width={VIEW} height={VIEW}>
-          {[0, 1, 2, 3].map((k) => (
-            <path key={k} className={`limb${k}`} fill="none" stroke={C.limb} strokeLinecap="round" strokeLinejoin="round" />
-          ))}
-          <path className="claws" fill="none" stroke={C.edge} strokeLinecap="round" />
-          <path className="spikes" fill={C.spike} stroke={C.edge} strokeWidth="0.8" strokeLinejoin="round" />
-          <path className="beard" stroke={C.edge} strokeWidth="0.8" strokeLinejoin="round" />
-          <path className="body" fill={C.body} stroke={C.edge} />
-          <path className="headtint" fill={C.head} opacity="0.7" />
-          <path className="ridge" fill="none" stroke={C.ridge} strokeLinecap="round" strokeLinejoin="round" opacity="0.45" />
-          <path className="pattern" fill={C.pattern} opacity="0.55" />
-          <path className="bands" fill="none" stroke={C.pattern} strokeLinecap="round" opacity="0.55" />
-          <path className="eyes" fill={C.eye} stroke="#5C3A14" strokeWidth="1" />
-          <path className="glint" fill="#fff" opacity="0.85" />
-          <path className="nose" fill={C.edge} />
+          <defs>
+            <clipPath id={clipId}>
+              <path className="clip" />
+            </clipPath>
+          </defs>
+          <path className="limbEdgeU" fill="none" stroke={C.dark} strokeOpacity="0.55" strokeLinecap="round" />
+          <path className="limbEdgeL" fill="none" stroke={C.dark} strokeOpacity="0.55" strokeLinecap="round" />
+          <path className="limbU" fill="none" stroke={C.limb} strokeLinecap="round" />
+          <path className="limbL" fill="none" stroke={C.limb} strokeLinecap="round" />
+          <path className="toes" fill="none" stroke={C.limb} strokeLinecap="round" />
+          <path className="claws" fill="none" stroke={C.dark} strokeLinecap="round" />
+          <path className="spikes" fill={C.spike} />
+          <path className="beard" />
+          <path className="body" fill={C.base} />
+          <g clipPath={`url(#${clipId})`}>
+            <path className="headtint" fill={C.head} opacity="0.8" />
+            <path className="mark0" fill={C.pale} opacity="0.4" />
+            <path className="mark1" fill={C.flank} opacity="0.32" />
+            <path className="bands" fill="none" stroke={C.flank} opacity="0.38" />
+            <path className="mark2" fill={C.pale} opacity="0.5" />
+            <path className="mark3" fill={C.flank} opacity="0.55" />
+            <path className="light0" fill="none" stroke={C.pale} strokeLinecap="round" strokeLinejoin="round" opacity="0.12" />
+            <path className="light1" fill="none" stroke={C.pale} strokeLinecap="round" strokeLinejoin="round" opacity="0.14" />
+            <path className="light2" fill="none" stroke={C.pale} strokeLinecap="round" strokeLinejoin="round" opacity="0.18" />
+            <path className="shade0" fill="none" stroke={C.dark} opacity="0.13" />
+            <path className="shade1" fill="none" stroke={C.dark} opacity="0.15" />
+            <path className="shade2" fill="none" stroke={C.dark} opacity="0.2" />
+          </g>
+          <path className="edge" fill="none" stroke={C.dark} strokeOpacity="0.6" />
+          <path className="brow" fill="none" stroke={C.dark} strokeOpacity="0.35" strokeLinecap="round" />
+          <path className="lids" fill="#8E6236" />
+          <path className="eyes" fill={C.eye} />
+          <path className="glint" fill="#fff" opacity="0.8" />
+          <path className="nose" fill={C.dark} />
           <path
             className="hit"
             fill="transparent"
