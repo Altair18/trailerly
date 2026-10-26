@@ -202,3 +202,6 @@ textarea.field { padding: 14px 18px; resize: vertical; line-height: 1.4; }
 .legal h2 { font-size: 22px; margin: 36px 0 10px; }
 .legal ul { padding-left: 20px; display: grid; gap: 8px; }
 .legal a { color: var(--tx); }
+.not-found { min-height: 60vh; }
+.not-found-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.not-found .not-found-links a { color: inherit; text-decoration: none; }
