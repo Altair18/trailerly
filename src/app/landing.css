@@ -199,12 +199,12 @@
 .lp-aura { position: absolute; z-index: 0; left: 50%; top: -60px; bottom: -120px; width: min(2200px, 160%); transform: translateX(-50%); pointer-events: none; }
 .lp-aura > div { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease; }
 .lp-aura > div.on { opacity: 1; }
-.lp-aura i { position: absolute; border-radius: 50%; filter: blur(110px); opacity: 0.5; animation: lp-breathe 9s ease-in-out infinite alternate; }
+.lp-aura i { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.26; animation: lp-breathe 9s ease-in-out infinite alternate; }
 .lp-aura i:nth-child(1) { left: 6%; top: 18%; width: 34%; height: 62%; }
 .lp-aura i:nth-child(2) { right: 6%; top: 10%; width: 34%; height: 66%; animation-delay: -3s; }
-.lp-aura i:nth-child(3) { left: 30%; bottom: 0; width: 40%; height: 34%; opacity: 0.32; animation-delay: -6s; }
+.lp-aura i:nth-child(3) { left: 30%; bottom: 0; width: 40%; height: 34%; opacity: 0.16; animation-delay: -6s; }
 @keyframes lp-breathe { from { transform: scale(0.9) translate(-3%, 2%); } to { transform: scale(1.1) translate(3%, -2%); } }
-@media (max-width: 640px) { .lp-aura i { filter: blur(70px); opacity: 0.35; } }
+@media (max-width: 640px) { .lp-aura i { filter: blur(70px); opacity: 0.2; } }
 @media (prefers-reduced-motion: reduce) { .lp-aura i { animation: none; } .lp-aura > div { transition: none; } }
 
 /* Side reels in the gutters beside the hero */
@@ -214,8 +214,23 @@
 .lp-reel.right { left: calc(100% + 8px); }
 .lp-reel-track { display: grid; gap: 14px; animation: lp-reel 60s linear infinite; }
 .lp-reel.right .lp-reel-track { animation-direction: reverse; }
-.lp-reel-tile { border-radius: 14px; opacity: 0.4; background-size: 200% 200%; display: flex; align-items: flex-end; padding: 10px; }
+.lp-reel-tile { border-radius: 14px; opacity: 0.22; background-size: 200% 200%; display: flex; align-items: flex-end; padding: 10px; }
 .lp-reel-tile span { font-size: 15px; color: var(--ink); }
 @keyframes lp-reel { to { transform: translateY(calc(-50% - 7px)); } }
 @media (min-width: 1600px) { .lp-reel { display: block; } }
 @media (prefers-reduced-motion: reduce) { .lp-reel-track { animation: none; } }
+
+/* Flying logo comet with a rainbow film-strip trail. Trail is a 250-unit dash travelling a 1000-unit path. */
+.lp-main { position: relative; }
+.lp-comet { position: absolute; left: 0; top: 0; width: 100%; height: 1000px; z-index: 15; pointer-events: none; overflow: hidden; --dur: 4s; }
+.lp-comet.long { --dur: 6.5s; }
+.lp-comet > svg { position: absolute; inset: 0; overflow: visible; }
+.lp-comet path { fill: none; }
+.lp-comet .trail { stroke-linecap: round; stroke-dasharray: 250 1250; stroke-dashoffset: 250; animation: lp-trail var(--dur) linear forwards; }
+.lp-comet .strip { stroke: url(#lp-comet-g); stroke-width: 14; opacity: 0.85; filter: drop-shadow(0 0 10px rgba(255, 46, 136, 0.6)); }
+.lp-comet .mask { stroke: #fff; stroke-width: 14; }
+.lp-comet .holes { stroke: #050507; stroke-width: 4; stroke-dasharray: 2 4; opacity: 0.85; }
+.lp-comet-head { position: absolute; left: 0; top: 0; offset-rotate: auto; offset-anchor: center; offset-distance: 0%; width: 44px; height: 32px; border-radius: 8px; background: var(--pink); border-top: 5px solid #000; border-bottom: 5px solid #000; box-sizing: border-box; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(255, 46, 136, 0.8); animation: lp-fly var(--dur) linear forwards; }
+@keyframes lp-fly { 0% { offset-distance: 0%; } 80%, 100% { offset-distance: 100%; } }
+@keyframes lp-trail { to { stroke-dashoffset: -1000; } }
+@media (max-width: 899px), (prefers-reduced-motion: reduce) { .lp-comet { display: none; } }
