@@ -54,7 +54,7 @@ export const compose = task({
       accent: await iconAccent(app.icon_url),
       style: await iconStyle(app.icon_url, listing.success ? listing.data.genre : null),
     };
-    // The preview's music comes from the library made once with ElevenLabs (public/music); none until it's made.
+    // The preview's music comes from the library in public/music (scripts/music/import.mjs); silent until it has beds.
     const manifest = await readFile(join(process.cwd(), "public/music/manifest.json"), "utf8").then((t) => JSON.parse(t) as MusicManifest).catch(() => null);
     const soundtrack = soundtrackFor(manifest, listing.success ? listing.data.genre : null, packId);
     const imageUrls = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));

@@ -1,0 +1,17 @@
+{
+  "beds": [],
+  "effects": [
+    {
+      "id": "whoosh",
+      "file": "music/whoosh.mp3"
+    },
+    {
+      "id": "pop",
+      "file": "music/pop.mp3"
+    },
+    {
+      "id": "tap",
+      "file": "music/tap.mp3"
+    }
+  ]
+}

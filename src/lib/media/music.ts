@@ -1,4 +1,4 @@
-// The music library made once with ElevenLabs (scripts/music/generate.mjs) and shipped in public/music. Pure: the
+// The music library (free Pixabay beds imported by scripts/music/import.mjs, ffmpeg-made effects) shipped in public/music. Pure: the
 // manifest is passed in, so the planner and tests can use it without the files.
 
 export interface MusicManifest {
