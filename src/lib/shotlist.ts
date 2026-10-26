@@ -15,6 +15,8 @@ export const RECORDING_TIPS = [
   "Use demo data: no real names, chats or contacts.",
   "Set the clock to 9:41 and charge the battery if you can.",
   "Use the built-in screen recorder and record all the shots in one go.",
+  "Record in light mode if your app has one: bright screens read better in small App Store videos.",
+  "Start each shot on a screen that already has content, not an empty, loading or blank screen.",
 ];
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
