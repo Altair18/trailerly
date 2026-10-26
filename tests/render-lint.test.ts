@@ -13,8 +13,8 @@ describe("blankShare", () => {
     expect(blankShare(frame(1), 128, 128)).toBeLessThan(0.05);
     expect(blankShare(frame(0.5), 128, 128)).toBeGreaterThan(0.15);
   });
-  it("ignores dark frames", () => {
-    expect(blankShare(new Uint8Array(128 * 128).fill(10), 128, 128)).toBe(0);
+  it("counts a flat dark frame as empty", () => {
+    expect(blankShare(new Uint8Array(128 * 128).fill(10), 128, 128)).toBeGreaterThan(0.5);
   });
 });
 
@@ -63,5 +63,16 @@ describe("landscape templates", () => {
         expect(lintLandscapeTimeline(built.timeline!), `${t.id} ${id}`).toEqual([]);
       }
     }
+  });
+});
+
+describe("blankShare on dark screens", () => {
+  it("flags an empty dark canvas and passes a busy dark-mode screen", () => {
+    const empty = new Uint8Array(128 * 128).fill(12);
+    for (let x = 0; x < 128; x += 3) for (let y = 0; y < 12; y++) empty[y * 128 + x] = 220;
+    expect(blankShare(empty, 128, 128)).toBeGreaterThan(0.5);
+    const busy = new Uint8Array(128 * 128).fill(12);
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x += 3) busy[y * 128 + x] = 220;
+    expect(blankShare(busy, 128, 128)).toBeLessThan(0.05);
   });
 });
