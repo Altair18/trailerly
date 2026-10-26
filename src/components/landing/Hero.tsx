@@ -89,6 +89,41 @@ export function Hero() {
     dragged.current = true;
     go(dx < 0 ? i + 1 : i - 1);
   }
+  // Hover tilt: mouse only, eased toward the pointer each frame, and back to flat on leave.
+  const tilt = useRef<HTMLDivElement>(null);
+  const tiltTarget = useRef({ x: 0, y: 0, on: 0 });
+  const tiltNow = useRef({ x: 0, y: 0, on: 0 });
+  const tiltRaf = useRef(0);
+  function tiltStep() {
+    const el = tilt.current;
+    if (!el) return;
+    const t = tiltTarget.current;
+    const c = tiltNow.current;
+    c.x += (t.x - c.x) * 0.12;
+    c.y += (t.y - c.y) * 0.12;
+    c.on += (t.on - c.on) * 0.12;
+    el.style.setProperty("--tx", c.x.toFixed(4));
+    el.style.setProperty("--ty", c.y.toFixed(4));
+    el.style.setProperty("--glare", c.on.toFixed(3));
+    const settled = Math.abs(t.x - c.x) + Math.abs(t.y - c.y) + Math.abs(t.on - c.on) < 0.001;
+    tiltRaf.current = settled ? 0 : requestAnimationFrame(tiltStep);
+  }
+  function kickTilt() {
+    if (!tiltRaf.current) tiltRaf.current = requestAnimationFrame(tiltStep);
+  }
+  function onTiltMove(e: React.PointerEvent) {
+    if (e.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    // -0.5..0.5 across the card.
+    tiltTarget.current = { x: (e.clientX - r.left) / r.width - 0.5, y: (e.clientY - r.top) / r.height - 0.5, on: 1 };
+    kickTilt();
+  }
+  function onTiltLeave() {
+    tiltTarget.current = { x: 0, y: 0, on: 0 };
+    kickTilt();
+  }
+  useEffect(() => () => cancelAnimationFrame(tiltRaf.current), []);
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === "ArrowRight") go(i + 1);
@@ -120,40 +155,44 @@ export function Hero() {
         ))}
       </div>
       <SideReels />
-      <div
-        key={i}
-        className="lp-tile lp-hero lp-fade"
-        aria-live={paused || manual ? "polite" : "off"}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => (drag.current = null)}
-        // A drag that ends on the CTA should change slide, not follow the link.
-        onClickCapture={(e) => {
-          if (dragged.current) {
-            e.preventDefault();
-            e.stopPropagation();
-            dragged.current = false;
-          }
-        }}
-        onDragStart={(e) => e.preventDefault()}
-      >
-        <div className="kb flow" style={{ backgroundImage: s.bg }} />
-        <div className="lp-phones" aria-hidden="true">
-          <div className="lp-phone bob">
-            <div style={{ background: s.screen }}><span className="disp">{s.hook}</span></div>
+      {/* Spotify-style hover: the card tilts toward the pointer, with a soft glare that follows it. */}
+      <div ref={tilt} className="lp-tilt" onPointerMove={onTiltMove} onPointerLeave={onTiltLeave}>
+        <div
+          key={i}
+          className="lp-tile lp-hero lp-fade"
+          aria-live={paused || manual ? "polite" : "off"}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => (drag.current = null)}
+          // A drag that ends on the CTA should change slide, not follow the link.
+          onClickCapture={(e) => {
+            if (dragged.current) {
+              e.preventDefault();
+              e.stopPropagation();
+              dragged.current = false;
+            }
+          }}
+          onDragStart={(e) => e.preventDefault()}
+        >
+          <div className="kb flow" style={{ backgroundImage: s.bg }} />
+          <div className="lp-phones" aria-hidden="true">
+            <div className="lp-phone bob">
+              <div style={{ background: s.screen }}><span className="disp">{s.hook}</span></div>
+            </div>
+            <div className="lp-side bob" style={{ background: s.side, animationDelay: "-1.5s" }} />
           </div>
-          <div className="lp-side bob" style={{ background: s.side, animationDelay: "-1.5s" }} />
-        </div>
-        <div className="lp-shade" style={{ height: "100%", background: "linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,0) 65%)" }} />
-        <div className="lp-hero-copy">
-          <span className="lp-tag" style={{ background: s.tagBg }}>{s.tag}</span>
-          <h1 className="disp">{s.title}</h1>
-          <p>{s.sub}</p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link className="btn btn-primary" href="/packs/new" style={{ minHeight: 52, fontSize: 16 }}>{s.cta}</Link>
-            <a className="btn btn-ghost" href="#explore" style={{ minHeight: 52, fontSize: 16, backdropFilter: "blur(8px)" }}>See examples</a>
+          <div className="lp-shade" style={{ height: "100%", background: "linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,0) 65%)" }} />
+          <div className="lp-hero-copy">
+            <span className="lp-tag" style={{ background: s.tagBg }}>{s.tag}</span>
+            <h1 className="disp">{s.title}</h1>
+            <p>{s.sub}</p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link className="btn btn-primary" href="/packs/new" style={{ minHeight: 52, fontSize: 16 }}>{s.cta}</Link>
+              <a className="btn btn-ghost" href="#explore" style={{ minHeight: 52, fontSize: 16, backdropFilter: "blur(8px)" }}>See examples</a>
+            </div>
           </div>
         </div>
+        <div className="lp-glare" aria-hidden="true" />
       </div>
       <div className="lp-ctrl">
         <button type="button" className="lp-arrow" aria-label="Previous slide" onClick={() => go(i - 1)}>
