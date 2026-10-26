@@ -2,7 +2,7 @@
 // no attribution needed). Download one track per bed below from pixabay.com/music into C:\trailerly\music, named
 // after the bed (e.g. music\bright-pop.mp3; any audio format ffmpeg reads), then run:
 //   node scripts/music/import.mjs
-// Each bed is cut to its first 32 s with a short fade out and normalised to -14 LUFS into public/music, and
+// Each bed loses any leading silence, is cut to 32 s with a short fade out and normalised to -14 LUFS into public/music, and
 // public/music/manifest.json lists the beds found plus the effects (whoosh/pop/tap, made with ffmpeg, already in
 // public/music). Beds with no file are left out, so the library can grow one track at a time.
 import { execFileSync } from "node:child_process";
@@ -36,8 +36,8 @@ for (const bed of BEDS) {
     continue;
   }
   execFileSync("ffmpeg", [
-    "-v", "error", "-y", "-i", join(IN, src), "-t", String(SECONDS),
-    "-af", `afade=t=out:st=${SECONDS - 1.5}:d=1.5,loudnorm=I=-14:TP=-1.5:LRA=11`,
+    "-v", "error", "-y", "-i", join(IN, src),
+    "-af", `silenceremove=start_periods=1:start_threshold=-45dB,atrim=0:${SECONDS},afade=t=out:st=${SECONDS - 1.5}:d=1.5,loudnorm=I=-14:TP=-1.5:LRA=11`,
     "-ar", "44100", "-ac", "2", "-b:a", "192k", join(OUT, `${bed.id}.mp3`),
   ]);
   console.log(`+ ${bed.id} <- ${src}`);
