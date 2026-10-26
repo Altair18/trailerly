@@ -49,3 +49,19 @@ describe("lintLandscapeTimeline", () => {
     ).toEqual([]);
   });
 });
+
+describe("landscape templates", () => {
+  it("pass the pacing rules at header and search lengths", async () => {
+    const { TEMPLATES, buildFromTemplate } = await import("@/lib/timeline/templates");
+    const { OUTPUT_SPECS } = await import("@/lib/specs/outputs");
+    const clips = [1, 2, 3].map((n) => ({ id: `clip_${n}`, start: 0, duration: 20, path: "", notes: { label: `Feature ${n}`, interest: 4, feature: `F${n}`, personal_info: false } }));
+    for (const t of TEMPLATES.filter((t) => t.shape === "landscape")) {
+      for (const id of ["header", "search"] as const) {
+        const fill = { template_id: t.id, beats: t.beats.map((b, i) => ({ source: `clip_${(i % 3) + 1}`, offset: 0, caption: b.caption ? "Short caption here" : undefined })) };
+        const built = buildFromTemplate(t, fill, OUTPUT_SPECS[id], { hook: "Never forget to water again", clips } as never);
+        expect(built.timeline, `${t.id} ${id}: ${built.errors.join("; ")}`).toBeTruthy();
+        expect(lintLandscapeTimeline(built.timeline!), `${t.id} ${id}`).toEqual([]);
+      }
+    }
+  });
+});

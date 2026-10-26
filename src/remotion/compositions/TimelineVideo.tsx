@@ -3,7 +3,7 @@ import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
-import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Media, type SafeArea, type SceneShot } from "./Landscape";
+import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
 import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, RevealWords, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
 
 export type { Brand } from "./parts";
@@ -25,13 +25,15 @@ export interface TimelineVideoProps extends Record<string, unknown> {
   imageUrls?: Record<string, string>;
   /** Header and search: the centred box every device crop keeps (fractions of the frame). */
   safeArea?: SafeArea;
+  /** Header and search: which look to shoot the cut in (see Landscape's LOOKS). */
+  look?: Look;
 }
 
 /** Frames of the crossfade from the end of a looping video back to its first shot. */
 const LOOP_FADE = 15;
 
 
-export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea }: TimelineVideoProps) {
+export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea, look }: TimelineVideoProps) {
   useBrandFonts();
   const { fps, width, durationInFrames } = useVideoConfig();
   const landscape = baseWidth > baseHeight;
@@ -47,7 +49,7 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
       <div style={{ position: "absolute", left: 0, top: 0, width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: "top left", overflow: "hidden" }}>
         {landscape ? (
           <>
-            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
+            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} look={look} />
             {base.map((seg, i) =>
               seg.type === "text" || seg.type === "end_card" ? (
                 <Sequence key={`c${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
@@ -78,7 +80,7 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
         {overlays.map((seg, i) => (
           <Sequence key={`o${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
             {landscape ? (
-              <LandscapeOverlay style={seg.style} text={seg.text} brand={brand} width={baseWidth} height={baseHeight} safe={safeArea} />
+              <LandscapeOverlay style={seg.style} text={seg.text} brand={brand} width={baseWidth} height={baseHeight} safe={safeArea} look={look} />
             ) : seg.style === "brand" ? (
               <BrandOverlay brand={brand} text={seg.text} width={baseWidth} />
             ) : seg.style === "caption" ? (
