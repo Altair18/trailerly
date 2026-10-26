@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { type BrandStyle, paletteFrom } from "./palette";
 
 const run = promisify(execFile);
 
@@ -46,16 +47,30 @@ export function pickAccent(rgb: Uint8Array): string {
   return hslHex(best.h / best.weight, Math.min(1, Math.max(0.6, best.s / best.weight)), 0.6);
 }
 
+async function iconPixels(url: string): Promise<Uint8Array> {
+  const { stdout } = await run("ffmpeg", ["-v", "error", "-i", url, "-vf", "scale=32:32", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], {
+    encoding: "buffer",
+    maxBuffer: 1024 * 1024,
+    timeout: 20_000,
+  });
+  return new Uint8Array(stdout);
+}
+
+/** The app's colours and type (see palette.ts), from its icon and genre. */
+export async function iconStyle(url: string | null | undefined, genre?: string | null): Promise<BrandStyle> {
+  if (!url) return paletteFrom(new Uint8Array(), genre);
+  try {
+    return paletteFrom(await iconPixels(url), genre);
+  } catch {
+    return paletteFrom(new Uint8Array(), genre);
+  }
+}
+
 /** Accent colour of the icon at `url` (any format ffmpeg reads), or DEFAULT_ACCENT if it can't be read. */
 export async function iconAccent(url: string | null | undefined): Promise<string> {
   if (!url) return DEFAULT_ACCENT;
   try {
-    const { stdout } = await run("ffmpeg", ["-v", "error", "-i", url, "-vf", "scale=32:32", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], {
-      encoding: "buffer",
-      maxBuffer: 1024 * 1024,
-      timeout: 20_000,
-    });
-    return pickAccent(new Uint8Array(stdout));
+    return pickAccent(await iconPixels(url));
   } catch {
     return DEFAULT_ACCENT;
   }

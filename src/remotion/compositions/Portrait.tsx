@@ -2,6 +2,7 @@ import { AbsoluteFill, Easing, Img, OffthreadVideo, interpolate, spring, useCurr
 import type { CSSProperties, ReactNode } from "react";
 import { Grain, keyWord, type Look, luminance, WARM, withAlpha } from "./Landscape";
 import { AppIcon, type Brand, DISPLAY, INK, RevealWords, SERIF, UI, YEL } from "./parts";
+import { BrandBackdrop, brandStyleOf, brandType, Headline, headlineSize, splitHeadline } from "./Brand";
 
 // The App Store preview (9:16) in the same three looks as the header and search videos. Modelled on top apps'
 // App Previews: the app's screen is the hero and stays put between shots (only what's on it changes), one short
@@ -129,8 +130,16 @@ export function balancedWidth(text: string, size: number, max: number, glyph = 0
 }
 
 /** The frame behind everything: the look's backdrop, and in the cinematic look a slow push of the whole stage. */
-export function PortraitStage({ look, accent, children }: { look: Look; accent: string; children: ReactNode }) {
+export function PortraitStage({ look, accent, children, brand, width, height }: { look: Look; accent: string; children: ReactNode; brand?: Brand; width?: number; height?: number }) {
   const frame = useCurrentFrame();
+  if (look === "brand" && width && height) {
+    return (
+      <AbsoluteFill>
+        <BrandBackdrop S={brandStyleOf(brand)} width={width} height={height} light={{ x: width * 0.5, y: height * 0.6 }} />
+        {children}
+      </AbsoluteFill>
+    );
+  }
   const { durationInFrames } = useVideoConfig();
   const S = portraitStyle(look, accent);
   const t = durationInFrames > 1 ? frame / (durationInFrames - 1) : 0;
@@ -229,7 +238,16 @@ export function PortraitShot({
 }
 
 /** A full-frame card with one line on it (text segments). */
-export function PortraitCard({ text, look, accent, width, height }: { text: string; look: Look; accent: string; width: number; height: number }) {
+export function PortraitCard({ text, look, accent, brand, width, height }: { text: string; look: Look; accent: string; brand?: Brand; width: number; height: number }) {
+  if (look === "brand") {
+    const B = brandStyleOf(brand);
+    return (
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: width * 0.1 }}>
+        <BrandBackdrop S={B} width={width} height={height} light={{ x: width / 2, y: height / 2 }} />
+        <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, width * 0.8, width * 0.13)} align="center" />
+      </AbsoluteFill>
+    );
+  }
   const S = portraitStyle(look, accent);
   const k = S.key(accent);
   return (
@@ -246,9 +264,23 @@ export function PortraitCard({ text, look, accent, width, height }: { text: stri
 }
 
 /** The hook or a caption: one line in the text box, rising in word by word and lifting away at the end. */
-export function PortraitLine({ text, look, accent, width, height }: { text: string; look: Look; accent: string; width: number; height: number }) {
+export function PortraitLine({ text, look, accent, brand, width, height, first = false }: { text: string; look: Look; accent: string; brand?: Brand; width: number; height: number; first?: boolean }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  if (look === "brand") {
+    // Agency previews set the line in two tones, already there on the first frame and crossfading between beats.
+    const B = brandStyleOf(brand);
+    const T = portraitLayout(look, width, height).text;
+    const fade = Math.min(
+      first ? 1 : interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp" }),
+      interpolate(frame, [durationInFrames - 6, durationInFrames], [1, 0], { extrapolateLeft: "clamp" }),
+    );
+    return (
+      <div style={{ position: "absolute", left: T.x, top: T.y, width: T.w, height: T.h, display: "flex", alignItems: "center", justifyContent: "center", opacity: fade }}>
+        <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.112)} align="center" />
+      </div>
+    );
+  }
   const S = portraitStyle(look, accent);
   const L = portraitLayout(look, width, height);
   const k = S.key(accent);
@@ -291,7 +323,7 @@ export function PortraitLine({ text, look, accent, width, height }: { text: stri
 export function PortraitBrand({ brand, text, look, width, height }: { brand?: Brand; text?: string; look: Look; width: number; height: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const S = portraitStyle(look, brand?.accent ?? "#FF2E88");
+  const S = look === "brand" ? brandPortraitStyle(brand) : portraitStyle(look, brand?.accent ?? "#FF2E88");
   const L = portraitLayout(look, width, height);
   const rise = spring({ frame, fps, config: { damping: 18, stiffness: 120 } });
   const icon = Math.round(width * 0.15);
@@ -322,20 +354,22 @@ export function PortraitBrand({ brand, text, look, width, height }: { brand?: Br
 }
 
 /** Close: icon, name and a short line, set in the look's type on its backdrop. */
-export function PortraitEnd({ brand, text, look, width }: { brand?: Brand; text?: string; look: Look; width: number }) {
+export function PortraitEnd({ brand, text, look, width, height }: { brand?: Brand; text?: string; look: Look; width: number; height?: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const S = portraitStyle(look, brand?.accent ?? "#FF2E88");
+  const S = look === "brand" ? brandPortraitStyle(brand) : portraitStyle(look, brand?.accent ?? "#FF2E88");
   const pop = spring({ frame, fps, config: { damping: 18, stiffness: 110 } });
   const late = spring({ frame: frame - 8, fps, config: { damping: 18, stiffness: 120 } });
   const icon = Math.round(width * 0.26);
   const k = S.key(brand?.accent ?? "#FF2E88");
   return (
     <AbsoluteFill style={{ background: S.background, alignItems: "center", justifyContent: "center", gap: width * 0.05, padding: "10%" }}>
+      {look === "brand" && height && <BrandBackdrop S={brandStyleOf(brand)} width={width} height={height} light={{ x: width / 2, y: height * 0.45 }} />}
       <div style={{ opacity: pop, transform: `translateY(${(1 - pop) * width * 0.04}px) scale(${0.94 + 0.06 * pop})` }}>
         <AppIcon brand={brand} size={icon} />
       </div>
-      <div style={{ ...S.type, textTransform: "none", color: S.ink, fontSize: lineSize(brand?.name ?? "", width, S.size * 1.1), textAlign: "center", opacity: pop }}>{brand?.name}</div>
+      {/* Positioned, so they paint over the brand backdrop (itself absolutely positioned). */}
+      <div style={{ ...S.type, position: "relative", textTransform: "none", color: S.ink, fontSize: lineSize(brand?.name ?? "", width, S.size * 1.1), textAlign: "center", opacity: pop }}>{brand?.name}</div>
       {text?.trim() && (
         <RevealWords
           text={text}
@@ -343,10 +377,26 @@ export function PortraitEnd({ brand, text, look, width }: { brand?: Brand; text?
           highlight={keyWord(text)}
           accent={k.accent}
           highlightStyle={k.style}
-          style={{ ...S.type, color: S.muted, fontSize: lineSize(text, width, S.size * 0.62), justifyContent: "center", textAlign: "center" }}
+          style={{ ...S.type, position: "relative", color: S.muted, fontSize: lineSize(text, width, S.size * 0.62), justifyContent: "center", textAlign: "center" }}
         />
       )}
-      <div style={{ ...UI, color: S.muted, fontSize: Math.round(width * 0.036), fontWeight: 500, letterSpacing: "0.02em", opacity: late }}>Download on the App Store</div>
+      <div style={{ ...UI, position: "relative", color: S.muted, fontSize: Math.round(width * 0.036), fontWeight: 500, letterSpacing: "0.02em", opacity: late }}>Download on the App Store</div>
     </AbsoluteFill>
   );
+}
+
+/** The brand look in the portrait style's terms, for the parts (brand line, end card) that share their layout. */
+function brandPortraitStyle(brand?: Brand): PortraitStyle {
+  const B = brandStyleOf(brand);
+  return {
+    background: `linear-gradient(170deg, ${B.bg}, ${B.bgDeep})`,
+    ink: B.ink,
+    muted: B.highlight,
+    type: brandType(B.font),
+    size: 0.1,
+    key: () => ({ accent: B.highlight }),
+    align: "center",
+    grain: 0,
+    push: () => 1,
+  };
 }

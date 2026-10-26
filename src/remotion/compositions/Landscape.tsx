@@ -72,10 +72,13 @@ const FILL: CSSProperties = { width: "100%", height: "100%", objectFit: "cover" 
  * - cinematic: Claude's App Preview: warm low-key light, one serif line, one slow push in, no sway.
  * - bold: Strava's App Preview: the app's own colour as the stage, heavy type, the phone straight on.
  */
-export type Look = "studio" | "cinematic" | "bold";
-export const LOOKS: Look[] = ["studio", "cinematic", "bold"];
-/** The user picked cinematic for header and search (26 Oct, from studio, cinematic and bold side by side). */
-export const DEFAULT_LOOK: Look = "cinematic";
+export type Look = "studio" | "cinematic" | "bold" | "brand";
+export const LOOKS: Look[] = ["studio", "cinematic", "bold", "brand"];
+/**
+ * brand (Brand.tsx): the app's own colours and type, screens filling the frame as flat cards. The user approved it
+ * on 26 Oct from the agency benchmark; it replaces cinematic (picked earlier the same day), whose calm motion it keeps.
+ */
+export const DEFAULT_LOOK: Look = "brand";
 
 /** Relative luminance of "#RRGGBB" (0 black to 1 white). */
 export function luminance(hex: string): number {
@@ -109,6 +112,8 @@ interface LookStyle {
 export const WARM = "#FFB37A";
 
 export function lookStyle(look: Look, accent: string): LookStyle {
+  // The brand look has its own scene (Brand.tsx); anything that still asks gets the cinematic values.
+  if (look === "brand") return lookStyle("cinematic", accent);
   if (look === "cinematic") {
     return {
       base: "#0D0A08",

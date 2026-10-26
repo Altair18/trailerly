@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { it } from "vitest";
 import { renderOutput } from "@/lib/render";
-import { iconAccent } from "@/lib/media/accent";
+import { iconAccent, iconStyle } from "@/lib/media/accent";
 import { lintLandscapeTimeline } from "@/lib/media/render-lint";
 import type { Look } from "@/remotion/compositions/Landscape";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
@@ -51,7 +51,7 @@ it("renders header and search", async () => {
           baseWidth: spec.width,
           baseHeight: spec.height,
           safeArea: spec.safeArea,
-          brand: { name: "Sprout", iconUrl: "http://localhost:4557/icon.png", accent: await iconAccent(join(D, "icon.png")) },
+          brand: { name: "Sprout", iconUrl: "http://localhost:4557/icon.png", accent: await iconAccent(join(D, "icon.png")), style: await iconStyle(join(D, "icon.png"), process.env.GENRE) },
           scale: SCALE,
           look,
         },

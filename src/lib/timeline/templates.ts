@@ -166,6 +166,8 @@ const BRAND_MIN = 2;
 const SCREENSHOT_MAX = 3.5;
 /** A closing card that only shows the app's name and a line. */
 const CLOSE_MAX = 3;
+/** A recording beat in a portrait video cuts after this long (agency previews cut every 3-5 s on real actions). */
+const CLIP_BEAT_MAX = 5;
 
 /** A caption that fits the on-screen limits: a few words, cut at a natural break, never over the character cap. */
 export function tidyCaption(text: string): string {
@@ -214,6 +216,14 @@ export function buildFromTemplate(
   // Stills never hold past a few seconds, unless the video would come out under the spec's minimum.
   const stillBeats = template.beats.length - (useEndCard ? 1 : 0);
   const stillMax = Math.max(SCREENSHOT_MAX, (spec.minSeconds + 0.5 - (useEndCard ? CLOSE_MAX : 0)) / stillBeats);
+  // Recording beats in portrait videos cut after a few seconds, unless the clips couldn't then fill the spec's minimum.
+  const clipCapFits =
+    !isLandscape(spec) &&
+    template.beats.reduce((n, b, i) => {
+      const clip = clips.get(fill.beats[i]!.source);
+      const offset = clip ? Math.min(fill.beats[i]!.offset ?? 0, Math.max(0, clip.duration - 0.5)) : 0;
+      return n + (b.role === "close" && useEndCard ? CLOSE_MAX : clip ? Math.min(CLIP_BEAT_MAX, clip.duration - offset) : stillMax);
+    }, 0) >= spec.minSeconds + 0.5;
   // Length each beat can have, and the least it needs to read its text.
   const slots = template.beats.map((b, i) => {
     const f = fill.beats[i]!;
@@ -226,7 +236,7 @@ export function buildFromTemplate(
     if (!isLastCard && !clip && !shots.has(f.source)) errors.push(`Beat ${i + 1}: unknown clip or screenshot "${f.source}".`);
     if (!clip && shots.has(f.source) && !canScreenshot) errors.push(`Beat ${i + 1}: ${spec.label} can't use screenshots.`);
     // Landscape beats never hold past the pacing limits; if the clips run short the video is a little shorter.
-    const cap = isLandscape(spec) ? (b.role === "close" ? MAX_OUTRO_SECONDS : MAX_BEAT_SECONDS) : isLastCard ? CLOSE_MAX : Infinity;
+    const cap = isLandscape(spec) ? (b.role === "close" ? MAX_OUTRO_SECONDS : MAX_BEAT_SECONDS) : isLastCard ? CLOSE_MAX : clip && clipCapFits ? CLIP_BEAT_MAX : Infinity;
     return { beat: b, source: f.source, clip, offset, available: Math.min(isLastCard ? Infinity : available, Math.max(cap, least)), want: (b.weight / weightSum) * total, least };
   });
   if (errors.length) return { timeline: null, errors };

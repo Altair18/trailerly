@@ -1,5 +1,6 @@
 import { Easing, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CSSProperties } from "react";
+import type { BrandStyle } from "@/lib/media/palette";
 
 // Shared look and motion for the portrait and landscape layouts.
 
@@ -8,6 +9,8 @@ export interface Brand {
   iconUrl: string | null;
   /** The app's colour (from its icon), for glows and the hook's key word. */
   accent?: string;
+  /** The app's own backdrop, highlight colour and type (from its icon and genre). */
+  style?: BrandStyle;
 }
 
 export const INK = "#0A0A0E";
