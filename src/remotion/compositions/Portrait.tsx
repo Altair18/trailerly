@@ -162,6 +162,9 @@ export type PortraitMedia = { kind: "video"; src: string; trimBefore: number } |
 /** Frames two store screenshots overlap while one is dealt over the other. */
 export const PORTRAIT_SWAP = 14;
 
+/** How far a store screenshot pushes in over its shot (brand look). */
+export const STILL_PUSH = 1.06;
+
 /**
  * One shot of the app's screen in its box.
  *
@@ -179,6 +182,7 @@ export function PortraitShot({
   fade,
   frames,
   centred = false,
+  focus,
 }: {
   media: PortraitMedia;
   look: Look;
@@ -189,9 +193,21 @@ export function PortraitShot({
   /** The shot's own length, before the next one overlaps it. */
   frames?: number;
   centred?: boolean;
+  /** Recording shots: push in slowly on where the action is (brand look). */
+  focus?: { x: number; y: number; zoom: number };
 }) {
   const frame = useCurrentFrame();
   const L = portraitLayout(look, width, height);
+  const push =
+    focus && look === "brand" && media.kind === "video" && frames
+      ? interpolate(frame, [0, frames], [1, focus.zoom], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.sin) })
+      : 1;
+  const pushStyle: CSSProperties = push > 1 ? { transform: `scale(${push})`, transformOrigin: `${focus!.x * 100}% ${focus!.y * 100}%` } : {};
+  // A store screenshot never sits dead still in the brand look: a slow push, as agency previews do with stills.
+  const drift =
+    look === "brand" && media.kind === "image" && frames
+      ? interpolate(frame, [0, frames + PORTRAIT_SWAP], [1, STILL_PUSH], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.sin) })
+      : 1;
   const card = media.kind === "image" && !L.bleed;
   const m = card && centred ? { ...L.media, y: (height - L.media.h) / 2 } : L.media;
   const fill: CSSProperties = { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%", display: "block" };
@@ -221,7 +237,13 @@ export function PortraitShot({
         <div style={{ ...box, boxShadow: `0 ${width * 0.04}px ${width * 0.1}px rgba(0,0,0,.5), 0 0 0 ${Math.max(2, Math.round(width * 0.004))}px rgba(255,255,255,.1)` }} />
       )}
       <div style={{ ...box, overflow: "hidden", opacity: card ? 1 : opacity, background: L.bleed && media.kind === "image" ? "transparent" : "#000" }}>
-        {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={{ ...still, ...cropStyle(media.crop) }} />}
+        {media.kind === "video" ? (
+          <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={{ ...fill, ...pushStyle }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", transform: drift > 1 ? `scale(${drift})` : undefined, transformOrigin: "50% 35%" }}>
+            <Img src={media.src} style={{ ...still, ...cropStyle(media.crop) }} />
+          </div>
+        )}
         {sheen > 0 && sheen < 1 && (
           <div
             style={{

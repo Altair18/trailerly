@@ -6,7 +6,9 @@
       "moods": [
         "upbeat",
         "playful"
-      ]
+      ],
+      "bpm": 109.96,
+      "beat0": 0.534
     },
     {
       "id": "calm-lofi",
@@ -14,7 +16,9 @@
       "moods": [
         "calm",
         "warm"
-      ]
+      ],
+      "bpm": 85.99,
+      "beat0": 0.406
     },
     {
       "id": "tech-pulse",
@@ -22,7 +26,9 @@
       "moods": [
         "focused",
         "tech"
-      ]
+      ],
+      "bpm": 93.28,
+      "beat0": 0.232
     },
     {
       "id": "acoustic-sun",
@@ -30,7 +36,9 @@
       "moods": [
         "warm",
         "natural"
-      ]
+      ],
+      "bpm": 125.13,
+      "beat0": 0.046
     },
     {
       "id": "cinematic-rise",
@@ -38,7 +46,9 @@
       "moods": [
         "premium",
         "calm"
-      ]
+      ],
+      "bpm": 90.03,
+      "beat0": 0.557
     },
     {
       "id": "energy-drive",
@@ -46,7 +56,9 @@
       "moods": [
         "energetic",
         "sport"
-      ]
+      ],
+      "bpm": 99.96,
+      "beat0": 0.615
     },
     {
       "id": "game-bounce",
@@ -54,7 +66,9 @@
       "moods": [
         "playful",
         "game"
-      ]
+      ],
+      "bpm": 140.82,
+      "beat0": 0.418
     },
     {
       "id": "soft-corporate",
@@ -62,7 +76,9 @@
       "moods": [
         "trust",
         "calm"
-      ]
+      ],
+      "bpm": 99.96,
+      "beat0": 0.046
     }
   ],
   "effects": [

@@ -6,7 +6,7 @@ import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
 import { DEFAULT_LOOK, LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
 import { type Brand, DISPLAY, ENTER_FRAMES, INK, PINK } from "./parts";
-import { BrandHeaderOverlay, BrandHeaderScene, BrandSearchOverlay, BrandSearchScene } from "./Brand";
+import { BrandHeaderOverlay, BrandHeaderScene, heldHeaderLine, BrandSearchOverlay, BrandSearchScene } from "./Brand";
 import { PORTRAIT_SWAP, PortraitBrand, PortraitCard, PortraitEnd, PortraitLine, PortraitShot, PortraitStage } from "./Portrait";
 
 export type { Brand } from "./parts";
@@ -51,7 +51,9 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   const accent = brand?.accent ?? PINK;
   const base = timeline.segments.filter((s) => !isOverlay(s)).sort((a, b) => a.start - b.start);
   // Store screenshots carry their own headline, so in the portrait layout a caption over one would make two.
-  const overlays = timeline.segments.filter(isOverlay).filter((o) => landscape || o.style !== "caption" || !overScreenshot(o, base));
+  const shown = timeline.segments.filter(isOverlay).filter((o) => landscape || o.style !== "caption" || !overScreenshot(o, base));
+  // A header holds one line for its whole loop.
+  const overlays = header && look === "brand" ? heldHeaderLine(shown, durationInFrames / fps) : shown;
 
   return (
     <AbsoluteFill style={{ backgroundColor: INK }}>
@@ -96,8 +98,11 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
             )}
           </PortraitStage>
         )}
-        {overlays.map((seg, i) => (
-          <Sequence key={`o${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
+        {overlays.map((seg, i) => {
+          const from = landscape || seg.style !== "brand" ? Math.round(seg.start * fps) : afterLanding(seg, base, fps);
+          const end = Math.round((seg.start + seg.duration) * fps);
+          return (
+          <Sequence key={`o${i}`} from={from} durationInFrames={Math.max(1, end - from)}>
             {landscape && look === "brand" ? (
               header ? (
                 <BrandHeaderOverlay style={seg.style} text={seg.text} brand={brand} width={baseWidth} height={baseHeight} safe={safeArea} first={seg.start < 0.05} last={i === overlays.length - 1} />
@@ -112,7 +117,8 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
               <PortraitLine text={seg.text ?? ""} look={look} accent={accent} brand={brand} width={baseWidth} height={baseHeight} first={seg.start < 0.05} />
             )}
           </Sequence>
-        ))}
+          );
+        })}
         {!landscape && soundtrack && <Sound soundtrack={soundtrack} base={base} overlays={overlays} />}
         {/* TODO(M5): voice-driven captions. */}
         {watermark && <Watermark width={landscape ? baseWidth * 0.45 : baseWidth} />}
@@ -121,6 +127,19 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   );
 }
 
+
+/**
+ * The closing words wait for a store-screenshot card that is still being dealt in to land, so the brand never
+ * appears over a moving card.
+ */
+export function afterLanding(seg: Segment, base: Segment[], fps: number): number {
+  const from = Math.round(seg.start * fps);
+  const card = base.find((b) => b.type === "screenshot" && b.start <= seg.start + 0.01 && b.start + b.duration > seg.start);
+  if (!card) return from;
+  const landed = Math.round(card.start * fps) + PORTRAIT_SWAP + 6;
+  const end = Math.round((seg.start + seg.duration) * fps);
+  return Math.min(Math.max(from, landed), Math.max(from, end - fps));
+}
 
 /** Frames the next shot overlaps this one: a store screenshot is dealt in over a longer swap than a cut. */
 function swapFrames(next: Segment): number {
@@ -194,7 +213,16 @@ function PortraitSegment({
   const image = segment.image_id ? imageUrls[segment.image_id] : undefined;
   const size = { look, width: baseWidth, height: baseHeight };
   if (segment.type === "screen" && src) {
-    return <PortraitShot media={{ kind: "video", src, trimBefore: Math.round((segment.clip_offset ?? 0) * fps) }} index={index} fade={ENTER_FRAMES} {...size} />;
+    return (
+      <PortraitShot
+        media={{ kind: "video", src, trimBefore: Math.round((segment.clip_offset ?? 0) * fps) }}
+        index={index}
+        fade={ENTER_FRAMES}
+        frames={Math.round(segment.duration * fps)}
+        focus={segment.focus}
+        {...size}
+      />
+    );
   }
   if (segment.type === "screenshot" && image) {
     return <PortraitShot media={{ kind: "image", src: image, crop: segment.crop }} index={index} fade={ENTER_FRAMES} frames={Math.round(segment.duration * fps)} centred={centred} {...size} />;

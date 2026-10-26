@@ -24,6 +24,8 @@ export const Segment = z.object({
   style: z.enum(["hook", "caption", "brand"]).optional(),
   /** Screenshot segments: shares of the image cut off the top and bottom (the screenshot's own headline). */
   crop: z.object({ top: z.number().min(0).max(0.6).optional(), bottom: z.number().min(0).max(0.6).optional() }).optional(),
+  /** Screen segments: where the action is (shares of the frame) and how far to push in on it over the shot. */
+  focus: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), zoom: z.number().min(1).max(1.3) }).optional(),
 });
 export type Segment = z.infer<typeof Segment>;
 
