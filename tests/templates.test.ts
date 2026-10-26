@@ -88,3 +88,23 @@ describe("cut templates", () => {
     expect(prompt.clips[0]).toMatchObject({ clip_id: "clip_1", seconds: 6 });
   });
 });
+
+describe("openings and hook lines", () => {
+  it("keeps whole hooks that fit, and cuts long ones at a phrase", async () => {
+    const { hookLine } = await import("@/lib/timeline/preview");
+    expect(hookLine("Ever talk problems through with AI, out loud?")).toBe("Ever talk problems through with AI, out loud?");
+    expect(hookLine("Photos, PDFs, screenshots — just ask what they mean")).toBe("Photos, PDFs, screenshots — just ask what they mean");
+    expect(hookLine("POV: you finally know exactly when every single plant needs water")).toBe("POV: you finally know exactly when every single");
+    expect(hookLine("Your plants, sorted, watered and thriving all year long with zero effort")).toBe("Your plants, sorted");
+  });
+
+  it("sends a plan back when it opens on an empty or loading screen and a better clip exists", () => {
+    const dull = [
+      { id: "clip_1", duration: 8, notes: { label: "Empty home screen", interest: 2, personal_info: false } },
+      ...clips.slice(1),
+    ];
+    const t = templateById("two-beat")!;
+    const fill = { template_id: "two-beat", beats: t.beats.map((b, i) => ({ source: dull[i]!.id, caption: b.caption ? "Plan your week fast" : undefined })) };
+    expect(buildFromTemplate(t, fill, OUTPUT_SPECS.header, { hook: "Hi there", clips: dull }).errors.join(" ")).toMatch(/opens on clip_1.*clip_2/);
+  });
+});

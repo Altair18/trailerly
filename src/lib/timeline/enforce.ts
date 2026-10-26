@@ -7,9 +7,13 @@ const EPS = 0.05;
 export const MAX_OVERLAY_WORDS = 7;
 export const MAX_OVERLAY_CHARS = 42;
 export const MAX_CARD_WORDS = 9;
+/** The opening hook gets a little more room: hooks are written to 8 words and read as one phrase. */
+export const MAX_HOOK_LINE_WORDS = 8;
+export const MAX_HOOK_LINE_CHARS = 56;
 /** Reading time: 0.3 s per word, never under 1.2 s. */
 export const readSeconds = (text: string) => Math.max(1.2, 0.3 * wordCount(text));
-export const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+/** Words, not counting stray punctuation such as a spaced dash. */
+export const wordCount = (text: string) => text.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
 export const isOverlay = (s: Segment) => s.type === "text" && s.overlay === true;
 export const totalSeconds = (timeline: Timeline) => Math.max(...timeline.segments.map((s) => s.start + s.duration));
@@ -45,8 +49,11 @@ export function enforceSpec(timeline: Timeline, spec: OutputSpec, clipSeconds?: 
     if (s.text?.trim()) {
       const words = wordCount(s.text);
       const where = `Text "${s.text}" at ${s.start}s`;
-      if (isOverlay(s) && (words > MAX_OVERLAY_WORDS || s.text.trim().length > MAX_OVERLAY_CHARS)) {
-        errors.push(`${where} is too long for on-screen text: use at most ${MAX_OVERLAY_WORDS} words and ${MAX_OVERLAY_CHARS} characters.`);
+      const hook = isOverlay(s) && s.style === "hook";
+      const maxWords = hook ? MAX_HOOK_LINE_WORDS : MAX_OVERLAY_WORDS;
+      const maxChars = hook ? MAX_HOOK_LINE_CHARS : MAX_OVERLAY_CHARS;
+      if (isOverlay(s) && (words > maxWords || s.text.trim().length > maxChars)) {
+        errors.push(`${where} is too long for on-screen text: use at most ${maxWords} words and ${maxChars} characters.`);
       } else if (!isOverlay(s) && words > MAX_CARD_WORDS) {
         errors.push(`${where} is too long: use at most ${MAX_CARD_WORDS} words.`);
       }

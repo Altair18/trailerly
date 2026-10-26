@@ -1,6 +1,6 @@
 import type { ChosenHooks, Hook } from "@/lib/schemas/hooks";
 import { readSeconds } from "./enforce";
-import { HEADLINE_SECONDS, shortLine } from "./preview";
+import { HEADLINE_SECONDS, hookLine } from "./preview";
 import type { Segment, Timeline } from "./schema";
 
 // A/B set for Apple's Product Page Optimization: the same cut with a different opening hook, so the test
@@ -23,7 +23,7 @@ const isHook = (s: Segment) => s.overlay && s.style !== "caption" && s.style !==
 
 /** The base timeline with its opening hook line swapped for `hook`, kept clear of the next overlay. */
 export function withHook(timeline: Timeline, hook: string): Timeline {
-  const line = shortLine(hook);
+  const line = hookLine(hook);
   const segments = timeline.segments.map((s) => ({ ...s }));
   let target = segments.find(isHook);
   if (!target) {

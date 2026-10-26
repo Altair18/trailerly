@@ -2,12 +2,47 @@ import { rankClips } from "@/lib/media/analyse";
 import { SCREENSHOT_SECONDS, type Screenshot } from "@/lib/media/screenshots";
 import { type Clip, isPrivate, liveRange } from "@/lib/schemas/clips";
 import type { OutputSpec } from "@/lib/specs/outputs";
-import { MAX_OVERLAY_WORDS, readSeconds, wordCount } from "./enforce";
+import { MAX_HOOK_LINE_CHARS, MAX_HOOK_LINE_WORDS, MAX_OVERLAY_WORDS, readSeconds, wordCount } from "./enforce";
 import type { Segment, Timeline } from "./schema";
 
 export const HEADLINE_SECONDS = 3;
 export const BRAND_SECONDS = 2.5;
 const round = (n: number) => Math.round(n * 100) / 100;
+
+const DANGLING = new Set(["and", "or", "but", "with", "to", "of", "the", "a", "an", "in", "on", "for", "your", "from", "at", "by"]);
+
+/** Drop joining words left hanging at the end of a cut line ("... any leaf and"). */
+export function dropDangling(words: string[]): string[] {
+  const out = [...words];
+  while (out.length > 2 && DANGLING.has(out[out.length - 1]!.toLowerCase().replace(/[^\p{L}]/gu, ""))) out.pop();
+  return out;
+}
+
+/**
+ * The opening hook as shown on screen. Hooks are written to fit, so the whole line is kept when it does;
+ * a longer one is cut at the last whole phrase that fits, and only then word by word.
+ */
+export function hookLine(text: string): string {
+  const clean = text.trim().replace(/\s+/g, " ");
+  const fits = (t: string) => wordCount(t) <= MAX_HOOK_LINE_WORDS && t.length <= MAX_HOOK_LINE_CHARS;
+  if (fits(clean)) return clean;
+  const parts = clean.split(/(?<=[,.!?:;\u2014])\s+|\s+(?=[-\u2013\u2014]\s)/);
+  let best = "";
+  let acc = "";
+  for (const part of parts) {
+    acc = acc ? `${acc} ${part}` : part;
+    const cut = acc.replace(/[\s,;:\u2013\u2014-]+$/, "");
+    if (!fits(cut)) break;
+    if (wordCount(cut) >= 2) best = cut;
+  }
+  if (best) return best;
+  const words: string[] = [];
+  for (const w of clean.split(" ")) {
+    if (!fits([...words, w].join(" "))) break;
+    words.push(w);
+  }
+  return dropDangling(words).join(" ").replace(/[,:;\u2013\u2014-]+$/, "");
+}
 
 /** Trim a headline to an on-screen line: the first few words, cut at a natural break if there is one. */
 export function shortLine(text: string, maxWords = MAX_OVERLAY_WORDS): string {
@@ -61,7 +96,7 @@ export function fallbackTimeline(
     t += duration;
   }
   if (headline) {
-    const line = shortLine(headline);
+    const line = hookLine(headline);
     segments.push({ type: "text", overlay: true, style: "hook", start: 0, duration: Math.max(HEADLINE_SECONDS, readSeconds(line)), text: line });
   }
   if (t >= HEADLINE_SECONDS + BRAND_SECONDS + 1) {

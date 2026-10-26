@@ -3,7 +3,7 @@ import { isPrivate, type Clip } from "@/lib/schemas/clips";
 import type { Screenshot } from "@/lib/media/screenshots";
 import { isLandscape, type OutputSpec } from "@/lib/specs/outputs";
 import { MAX_OVERLAY_CHARS, MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
-import { shortLine } from "./preview";
+import { dropDangling, hookLine, shortLine } from "./preview";
 import type { Segment, Timeline } from "./schema";
 
 // Proven cut structures. The model picks one and fills its slots (which shot plays in each beat, and a short
@@ -117,6 +117,11 @@ export const TEMPLATES: CutTemplate[] = [
   },
 ];
 
+const DULL = /\b(empty|blank|home ?screen|loading|splash|log ?in|sign ?in|launch(es|ing)?|onboarding)\b/i;
+
+/** A clip that makes a weak first shot: rated dull, or an empty, home, loading or login screen. */
+export const weakOpener = (c: Pick<Clip, "notes">) => (c.notes?.interest ?? 3) <= 2 || DULL.test(c.notes?.label ?? "");
+
 export const templateById = (id: string) => TEMPLATES.find((t) => t.id === id);
 
 /** Templates that fit an output, minus `avoid` (used by sibling outputs) while at least one is left. */
@@ -157,15 +162,11 @@ const BRAND_MIN = 2;
 /** A still screenshot holds attention for a few seconds at most. */
 const SCREENSHOT_MAX = 5;
 
-const DANGLING = new Set(["and", "or", "but", "with", "to", "of", "the", "a", "an", "in", "on", "for", "your", "from", "at", "by"]);
-
 /** A caption that fits the on-screen limits: a few words, cut at a natural break, never over the character cap. */
 export function tidyCaption(text: string): string {
   const words = shortLine(text, MAX_OVERLAY_WORDS).split(/\s+/).filter(Boolean);
   while (words.length > 1 && words.join(" ").length > MAX_OVERLAY_CHARS) words.pop();
-  // Don't leave a line hanging on a joining word ("... any leaf and").
-  while (words.length > 2 && DANGLING.has(words[words.length - 1]!.toLowerCase())) words.pop();
-  return words.join(" ").replace(/[,:;]$/, "");
+  return dropDangling(words).join(" ").replace(/[,:;]$/, "");
 }
 
 /**
@@ -187,12 +188,18 @@ export function buildFromTemplate(
   const shots = new Set((ctx.screenshots ?? []).map((s) => s.id));
   const canScreenshot = spec.allowedSegments.includes("screenshot");
 
-  const hookLine = tidyCaption(ctx.hook ?? fill.beats[0]?.caption ?? "");
+  const opening = hookLine(ctx.hook ?? fill.beats[0]?.caption ?? "");
   const captions = template.beats.map((b, i) => (b.caption ? tidyCaption(fill.beats[i]!.caption ?? "") : ""));
   template.beats.forEach((b, i) => {
     if (b.caption && !captions[i]) errors.push(`Beat ${i + 1} (${b.role}) needs a caption.`);
   });
-  if (!hookLine) errors.push("Beat 1 needs a caption: it is the opening hook line.");
+  if (!opening) errors.push("Beat 1 needs a caption: it is the opening hook line.");
+  // The first second sells the video: never open on an empty or loading screen when a better shot exists.
+  const first = clips.get(fill.beats[0]?.source ?? "");
+  if (first && weakOpener(first)) {
+    const better = [...clips.values()].filter((c) => !weakOpener(c) && !isPrivate(c.notes)).sort((a, b) => (b.notes?.interest ?? 3) - (a.notes?.interest ?? 3))[0];
+    if (better) errors.push(`Beat 1 opens on ${first.id} (${first.notes?.label ?? "a dull screen"}); open on a busier clip such as ${better.id} instead.`);
+  }
 
   const total = Math.min(spec.maxSeconds, Math.max(spec.minSeconds, spec.targetSeconds));
   const weightSum = template.beats.reduce((n, b) => n + b.weight, 0);
@@ -205,7 +212,7 @@ export function buildFromTemplate(
     const clip = clips.get(f.source);
     const offset = clip ? Math.min(f.offset ?? 0, Math.max(0, clip.duration - 0.5)) : 0;
     const available = clip ? clip.duration - offset : SCREENSHOT_MAX;
-    const text = i === 0 ? hookLine : b.role === "close" ? cta : captions[i]!;
+    const text = i === 0 ? opening : b.role === "close" ? cta : captions[i]!;
     const least = Math.max(b.role === "close" ? BRAND_MIN : 1.2, text ? readSeconds(text) : 0);
     const isLastCard = b.role === "close" && useEndCard;
     if (!isLastCard && !clip && !shots.has(f.source)) errors.push(`Beat ${i + 1}: unknown clip or screenshot "${f.source}".`);
@@ -267,7 +274,7 @@ export function buildFromTemplate(
         ? { type: "screen", start, duration, clip_id: s.clip.id, clip_offset: round(s.offset) }
         : { type: "screenshot", start, duration, image_id: s.source },
     );
-    if (i === 0) overlays.push({ type: "text", overlay: true, style: "hook", start, duration, text: hookLine });
+    if (i === 0) overlays.push({ type: "text", overlay: true, style: "hook", start, duration, text: opening });
     else if (s.beat.role === "close") overlays.push({ type: "text", overlay: true, style: "brand", start, duration });
     else if (captions[i]) overlays.push({ type: "text", overlay: true, style: "caption", start, duration, text: captions[i] });
   });
@@ -280,7 +287,8 @@ every beat in order with what plays in it.
 For each beat give {"source": a clip_id or image_id, "offset": seconds into the clip to start (clips only),
 "caption": on-screen text (only for beats with caption: true)}. Timing is worked out for you from the template.
 
-Choosing media: match each beat's note. Prefer high-interest clips, and use each clip at most once unless there are
+Choosing media: beat 1 must show the app in action, never a clip marked weak_opener (an empty, home, loading or
+login screen). Match each beat's note. Prefer high-interest clips, and use each clip at most once unless there are
 too few. Start clips after any dead_time (frozen, loading or black stretches) by setting offset. Never use a clip
 marked personal_info unless nothing else fits. Use screenshots only when the clips run out or are private.
 
@@ -309,6 +317,7 @@ export function templatePrompt(
       feature: c.notes?.feature ?? undefined,
       interest: c.notes?.interest,
       personal_info: isPrivate(c.notes) || undefined,
+      weak_opener: weakOpener(c) || undefined,
       dead_time: (c as Pick<Clip, "idle">).idle?.length ? (c as Pick<Clip, "idle">).idle : undefined,
     })),
     screenshots: ctx.screenshots?.length && spec.allowedSegments.includes("screenshot")

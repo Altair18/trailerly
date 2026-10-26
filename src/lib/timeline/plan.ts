@@ -48,6 +48,7 @@ export async function planTimeline(
   spec: OutputSpec,
   ctx: PlanContext,
   generate: Generate,
+  tiers: Tier[] = PLAN_TIERS,
 ): Promise<{ timeline: Timeline; source: Tier | "fallback"; attempts: number; errors: string[] }> {
   ctx = { ...ctx, clips: safeClips(ctx.clips, spec, (ctx.screenshots?.length ?? 0) * SCREENSHOT_SECONDS) };
   const clipSeconds = Object.fromEntries(ctx.clips.map((c) => [c.id, c.duration]));
@@ -57,7 +58,7 @@ export async function planTimeline(
   const fillCtx = { hook, clips: ctx.clips, screenshots: ctx.screenshots, brief: ctx.brief };
   let feedback = "";
   const seen: string[] = [];
-  for (const [i, tier] of PLAN_TIERS.entries()) {
+  for (const [i, tier] of tiers.entries()) {
     try {
       const fill = await generate(templatePrompt(spec, fillCtx, templates, feedback), tier);
       const template = templates.find((t) => t.id === fill.template_id);
@@ -74,5 +75,5 @@ export async function planTimeline(
     seen.push(feedback);
   }
   const timeline = fallbackTimeline(ctx.clips, hook, spec, ctx.screenshots);
-  return { timeline: { ...timeline, planned_by: "fallback" }, source: "fallback", attempts: PLAN_TIERS.length, errors: seen };
+  return { timeline: { ...timeline, planned_by: "fallback" }, source: "fallback", attempts: tiers.length, errors: seen };
 }
