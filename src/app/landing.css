@@ -250,7 +250,7 @@
 
 /* Bearded dragon visitor: walks onto a card to bask now and then; runs off when hovered or tapped. */
 .lp-dragon-layer { position: absolute; inset: 0; z-index: 16; pointer-events: none; }
-.lp-dragon { position: absolute; left: 0; top: 0; display: none; width: 600px; height: 600px; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); will-change: transform; }
-.lp-dragon svg { display: block; overflow: visible; }
+.lp-dragon { position: absolute; left: 0; top: 0; display: none; width: 600px; height: 600px; pointer-events: none; will-change: transform; }
+.lp-dragon-gl, .lp-dragon-hit { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .lp-dragon .hit { pointer-events: all; cursor: pointer; touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) { .lp-dragon-layer { display: none; } }
