@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { PageHead } from "@/components/AppLine";
 import { TopBar } from "@/components/TopBar";
+import { PRICES } from "@/components/landing/pricing";
 import { tile } from "@/lib/palette";
+import { checkoutProblem, finalsBusy } from "@/lib/payment";
 import { DRAFT_SCALE, DRAFT_SPECS, OUTPUT_SPECS, VARIANT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { isOverlay, totalSeconds } from "@/lib/timeline/enforce";
 import { TimelineVideo, type TimelineVideoProps } from "@/remotion/compositions/TimelineVideo";
@@ -14,7 +16,9 @@ import { type PackState, usePack } from "../usePack";
 type Output = PackState["outputs"][number];
 
 const rendering = (o: Output) => o.status === "queued" || o.status === "planning" || o.status === "rendering";
-const busy = (p: PackState) => p.outputs.some(rendering);
+/** Back from Stripe: the webhook can land a moment after the redirect, so keep polling until it does. */
+const justPaid = () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("paid");
+const busy = (p: PackState) => p.outputs.some(rendering) || finalsBusy(p.status) || (p.status === "draft" && justPaid());
 
 const STATUS_LABEL: Record<Output["status"], string> = {
   queued: "Queued",
@@ -32,6 +36,8 @@ export function Drafts({ packId }: { packId: string }) {
   const { pack, error, reload } = usePack(packId, busy);
   const [open, setOpen] = useState<OutputSpecId>("preview");
   const [retrying, setRetrying] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   const outputs = pack?.outputs ?? [];
   const byId = Object.fromEntries(outputs.map((o) => [o.spec, o])) as Partial<Record<OutputSpecId, Output>>;
@@ -39,6 +45,28 @@ export function Drafts({ packId }: { packId: string }) {
   const ready = expected.filter((s) => byId[s]?.status === "ready").length;
   const variants = VARIANT_SPECS.filter((s) => byId[s]);
   const selected = byId[open];
+
+  const finals = outputs.flatMap((o) => o.finals);
+  const problem = pack ? checkoutProblem(pack.status, outputs, expected) : null;
+  // Back from Stripe before its webhook lands: say so, and don't offer the pay button a second time.
+  const confirming = pack?.status === "draft" && justPaid();
+
+  async function pay() {
+    setPaying(true);
+    setPayError(null);
+    const res = await fetch("/api/stripe/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ packId }) });
+    const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+    if (res.ok && body.url) return window.location.assign(body.url);
+    setPayError(body.error ?? "Checkout didn't open. Try again.");
+    setPaying(false);
+  }
+
+  async function retryFinals() {
+    setRetrying(true);
+    await fetch(`/api/packs/${packId}/final`, { method: "POST" });
+    await reload();
+    setRetrying(false);
+  }
 
   async function retry() {
     setRetrying(true);
@@ -49,18 +77,44 @@ export function Drafts({ packId }: { packId: string }) {
 
   return (
     <>
-      <TopBar step="Drafts" />
+      <TopBar step={pack?.status === "ready" ? "Download" : finalsBusy(pack?.status ?? "draft") ? "Pay" : "Drafts"} />
       <main className="wrap" style={{ paddingTop: 32, paddingBottom: 120 }}>
         {error && <p role="alert">{error}</p>}
-        <PageHead app={pack?.app ?? null} step={5} title="Your drafts">
+        <PageHead app={pack?.app ?? null} step={pack?.status === "ready" ? 8 : 5} title={pack?.status === "ready" ? "Your pack" : "Your drafts"}>
           <div style={{ display: "grid", gap: 8, minWidth: 280 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "var(--tx)" }}>
               <span>{ready} of {expected.length} ready</span>
             </div>
             <div className="bar"><span style={{ width: `${(ready / expected.length) * 100}%` }} /></div>
-            <span style={{ fontSize: 13 }}>Low-resolution and watermarked. Finals render after you pay.</span>
+            <span style={{ fontSize: 13 }}>
+              {pack?.status === "ready" ? "Paid. Full-size files are below." : "Low-resolution and watermarked. Finals render after you pay."}
+            </span>
           </div>
         </PageHead>
+
+        {finals.length > 0 && (
+          <section id="downloads" className="card rise" style={{ marginTop: 28, display: "grid", gap: 14 }}>
+            <div>
+              <span className="lab" style={{ color: "var(--lime)" }}><span className="dot" />Your pack</span>
+              <p className="disp" style={{ margin: "8px 0 0", fontSize: 32 }}>Full size, no watermark</p>
+              <p className="mu" style={{ margin: "6px 0 0", fontSize: 14 }}>Each file is named for its slot in App Store Connect.</p>
+            </div>
+            {pack?.zip && (
+              <a className="btn btn-light" href={pack.zip} style={{ justifySelf: "start" }}>
+                Download all (.zip, with a sheet of where each file goes)
+              </a>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+              {finals.map((f) => (
+                <a key={f.fileName} href={f.url} download={f.fileName} style={{ display: "grid", gap: 4, padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 12, color: "inherit", textDecoration: "none", minWidth: 0 }}>
+                  <span style={{ fontWeight: 700 }}>{f.label} ↓</span>
+                  <span className="mono mu" style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
 
         <h2 className="lab mu rise" style={{ margin: "22px 0 12px", display: "flex", gap: 10, alignItems: "center" }}>
           App Store
@@ -172,14 +226,49 @@ export function Drafts({ packId }: { packId: string }) {
 
         <div className="actionbar">
           <span style={{ flex: "1 1 260px" }}>
-            <b>{ready === expected.length ? "Drafts ready." : "Rendering your drafts…"}</b>{" "}
-            <span className="mu">Rules, payment and download arrive in the next phases.</span>
+            {pack && <ActionText status={pack.status} drafting={ready < expected.length} problem={problem} checkout={pack.checkout} error={payError} confirming={confirming} />}
           </span>
-          <Link className="btn btn-ghost" href={`/packs/${packId}`}>Back to hooks</Link>
+          {pack?.status === "draft" && <Link className="btn btn-ghost" href={`/packs/${packId}`}>Back to hooks</Link>}
+          {pack?.status === "draft" && pack.checkout && !problem && !confirming && (
+            <button className="btn btn-light" type="button" onClick={pay} disabled={paying}>
+              {paying ? "Opening checkout…" : `Pay${PRICES.launch ? ` ${PRICES.launch}` : ""} and download`}
+            </button>
+          )}
+          {pack?.status === "failed" && (
+            <button className="btn btn-light" type="button" onClick={retryFinals} disabled={retrying}>
+              {retrying ? "Retrying…" : "Retry full-size files"}
+            </button>
+          )}
+          {pack?.status === "ready" && <a className="btn btn-light" href={pack.zip ?? "#downloads"}>{pack.zip ? "Download all" : "Download"}</a>}
         </div>
       </main>
     </>
   );
+}
+
+function ActionText({ status, drafting, problem, checkout, error, confirming }: {
+  status: PackState["status"];
+  drafting: boolean;
+  problem: string | null;
+  checkout: boolean;
+  error: string | null;
+  confirming: boolean;
+}) {
+  if (confirming) return <><span className="spinner" aria-hidden="true" /> <b>Confirming your payment…</b></>;
+  if (error) return <b style={{ color: "var(--coral)" }}>{error}</b>;
+  if (finalsBusy(status)) {
+    return (
+      <>
+        <span className="spinner" aria-hidden="true" /> <b>Payment received.</b> <span className="mu">Rendering your full-size files, usually a few minutes.</span>
+      </>
+    );
+  }
+  if (status === "ready") return <><b>Your pack is ready.</b> <span className="mu">Download each file below.</span></>;
+  if (status === "failed") return <><b>Some full-size files didn&apos;t render.</b> <span className="mu">You&apos;ve paid, so retrying is free.</span></>;
+  if (drafting) return <b>Rendering your drafts…</b>;
+  if (problem) return <><b>Drafts ready.</b> <span className="mu">{problem}</span></>;
+  if (!checkout) return <><b>Drafts ready.</b> <span className="mu">Checkout opens soon; full-size downloads come with it.</span></>;
+  return <><b>Drafts ready.</b> <span className="mu">Pay once to get every file at full size, without the watermark.</span></>;
 }
 
 function Detail({

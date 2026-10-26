@@ -13,6 +13,8 @@ export const paths = {
   poster: (packId: string, version: string, n: number, suffix = "") => `packs/${packId}/clips/${version}/clip-${n}${suffix}.jpg`,
   draft: (packId: string, spec: string) => `packs/${packId}/drafts/${spec}.mp4`,
   draftStill: (packId: string, still: string) => `packs/${packId}/drafts/still-${still}.png`,
+  // Paid, full-size files keep the name they ship with, so a download lands named for its App Store Connect slot.
+  final: (packId: string, fileName: string) => `packs/${packId}/final/${fileName}`,
 };
 
 export async function createUploadUrl(path: string) {
@@ -36,6 +38,12 @@ export async function signedUrl(path: string, seconds = 3600): Promise<string> {
   const { data, error } = await bucket().createSignedUrl(path, seconds);
   if (error) throw error;
   return data.signedUrl;
+}
+
+/** A signed URL that downloads the file under `fileName` instead of opening it. */
+export async function downloadUrl(path: string, fileName: string, seconds = 3600): Promise<string | null> {
+  const { data, error } = await bucket().createSignedUrl(path, seconds, { download: fileName });
+  return error ? null : data.signedUrl;
 }
 
 export async function signedUrls(list: string[], seconds = 3600): Promise<Record<string, string>> {

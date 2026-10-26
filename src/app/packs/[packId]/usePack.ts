@@ -8,10 +8,12 @@ import type { ShotList } from "@/lib/schemas/shotlist";
 import type { OutputSpecId } from "@/lib/specs/outputs";
 import type { StillId } from "@/lib/specs/stills";
 import type { Timeline } from "@/lib/timeline/schema";
-import type { OutputStatus, PackStage, RuleResultValue, SourceStatus } from "@/types/db";
+import type { OutputStatus, PackStage, PackStatus, RuleResultValue, SourceStatus } from "@/types/db";
 
 export interface PackState {
   id: string;
+  /** Payment lifecycle: draft until paid, then paid -> rendering -> ready (or failed). */
+  status: PackStatus;
   stage: PackStage;
   stage_error: string | null;
   brief_json: Brief | null;
@@ -37,9 +39,15 @@ export interface PackState {
     rules: Array<{ rule: string; result: RuleResultValue; detail: string | null }>;
     /** iOS 27 stills taken from this output (header and search only). */
     stills: Array<{ id: StillId; label: string; size: string; fileName: string; url: string }>;
+    /** Full-size files once paid, with download links named for App Store Connect. */
+    finals: Array<{ label: string; fileName: string; url: string }>;
   }>;
   /** App Store screenshot ids -> URLs, for screenshot segments in the player. */
   images: Record<string, string>;
+  /** True when Stripe is set up and the pay button can show. */
+  checkout: boolean;
+  /** Every full-size file plus the placement sheet in one zip, once paid. */
+  zip: string | null;
 }
 
 /** Load a pack and keep polling every 2 s while `busy(pack)` is true. */

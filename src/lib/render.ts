@@ -30,6 +30,8 @@ export async function renderOutput(opts: {
   props: RenderProps;
   outFile: string;
   onProgress?: (progress: number) => void;
+  /** Add a silent stereo track: App Store Connect expects app previews to carry audio. */
+  silentAudio?: boolean;
 }): Promise<void> {
   const { renderMedia, selectComposition } = await import("@remotion/renderer");
   const serveUrl = await bundleOnce();
@@ -40,7 +42,8 @@ export async function renderOutput(opts: {
     composition,
     inputProps: opts.props,
     codec: "h264",
-    muted: true,
+    muted: !opts.silentAudio,
+    enforceAudioTrack: !!opts.silentAudio,
     outputLocation: opts.outFile,
     browserExecutable,
     onProgress: ({ progress }) => opts.onProgress?.(progress),

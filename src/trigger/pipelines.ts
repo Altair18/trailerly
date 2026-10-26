@@ -10,7 +10,10 @@ import { planTimelines } from "./05-plan-timelines";
 import { compose } from "./08-compose";
 import { checkRules } from "./09-check-rules";
 import { packagePack } from "./10-package";
-import { DRAFT_SPECS, draftSpecsFor } from "@/lib/specs/outputs";
+import { finalStatus } from "@/lib/payment";
+import { draftSpecsFor } from "@/lib/specs/outputs";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { PackStatus } from "@/types/db";
 import type { PackPayload } from "./payload";
 
 // The pipeline pauses for the user twice (edit brief + pick hooks, then pay),
@@ -53,11 +56,38 @@ export const renderDrafts = task({
   },
 });
 
-/** Paid -> full-resolution renders and the zip. Triggered by the Stripe webhook. */
+/** Paid -> full-resolution renders of exactly the drafts the user saw. Triggered by the Stripe webhook. */
 export const renderFinal = task({
   id: "render-final",
+  retry: { maxAttempts: 1 },
   run: async ({ packId }: PackPayload) => {
-    await compose.triggerAndWait({ packId, specs: DRAFT_SPECS, final: true }).unwrap();
-    return packagePack.triggerAndWait({ packId }).unwrap();
+    const { pack } = await loadPackWithApp(packId);
+    const chosen = ChosenHooks.parse(pack.chosen_hooks ?? { social: [], headline: null });
+    const specs = draftSpecsFor(variantHooks(chosen, (pack.hooks_json ?? []) as Hook[]));
+    await setPackStatus(packId, "rendering");
+    // A retry after a partial failure only renders what's still missing.
+    const { data: done } = await supabaseAdmin().from("outputs").select("spec").eq("pack_id", packId).not("final_url", "is", null);
+    const already = specs.filter((s) => done?.some((o) => o.spec === s));
+    const todo = specs.filter((s) => !already.includes(s));
+    // Full size is slow (the header is 3840 wide), so each output renders on its own machine at the same time
+    // rather than one after another, which could run past the task's hour.
+    const batch = todo.length
+      ? await compose.batchTriggerAndWait(todo.map((id) => ({ payload: { packId, specs: [id], final: true } })))
+      : { runs: [] };
+    const rendered = [...already, ...batch.runs.flatMap((r) => (r.ok ? r.output.rendered : []))];
+    const failed = specs.filter((s) => !rendered.includes(s));
+    // The zip is a convenience on top of the single files, so its failure doesn't fail the pack.
+    const zipped = await packagePack.triggerAndWait({ packId, specs: rendered });
+    if (!zipped.ok) logger.warn("No zip", { packId });
+    await setPackStatus(packId, finalStatus(specs, rendered));
+    return { rendered, failed };
+  },
+  onFailure: async ({ payload }) => {
+    await setPackStatus(payload.packId, "failed");
   },
 });
+
+async function setPackStatus(packId: string, status: PackStatus) {
+  const { error } = await supabaseAdmin().from("packs").update({ status }).eq("id", packId);
+  if (error) logger.error("Pack status not saved", { packId, status, error: error.message });
+}

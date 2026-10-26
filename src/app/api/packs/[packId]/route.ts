@@ -8,7 +8,10 @@ import { ChosenHooks, type Hook } from "@/lib/schemas/hooks";
 import { appScreenshots } from "@/lib/media/screenshots";
 import { Listing } from "@/lib/schemas/listing";
 import { stillsFor } from "@/lib/specs/stills";
-import { paths, signedUrls } from "@/lib/storage";
+import { PACK_ZIP } from "@/lib/placement";
+import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
+import { downloadUrl, paths, signedUrls } from "@/lib/storage";
+import { checkoutOpen } from "@/lib/stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type Params = { params: Promise<{ packId: string }> };
@@ -29,7 +32,7 @@ export async function GET(_req: Request, { params }: Params) {
     .maybeSingle();
   const { data: outputs } = await db
     .from("outputs")
-    .select("id, spec, status, error, rules_status, draft_url, timeline_json")
+    .select("id, spec, status, error, rules_status, draft_url, final_url, timeline_json")
     .eq("pack_id", pack.id);
   const outputIds = (outputs ?? []).map((o) => o.id);
   const { data: rules } = outputIds.length
@@ -44,6 +47,21 @@ export async function GET(_req: Request, { params }: Params) {
     ...(outputs ?? []).flatMap((o) => (o.draft_url ? [o.draft_url] : [])),
     ...(outputs ?? []).flatMap((o) => stillPaths(o).map((s) => s.path)),
   ]);
+  // Paid files download under their App Store Connect names.
+  const finals = Object.fromEntries(
+    await Promise.all(
+      (outputs ?? []).flatMap((o) => (o.final_url ? [o] : [])).map(async (o) => {
+        const spec = OUTPUT_SPECS[o.spec as OutputSpecId];
+        const files = [
+          { label: spec.label, fileName: spec.fileName, path: o.final_url! },
+          ...stillsFor(o.spec as never).map((s) => ({ label: s.label, fileName: s.fileName, path: paths.final(pack.id, s.fileName) })),
+        ];
+        const signed = await Promise.all(files.map(async (f) => ({ label: f.label, fileName: f.fileName, url: await downloadUrl(f.path, f.fileName) })));
+        return [o.id, signed.flatMap((f) => (f.url ? [{ ...f, url: f.url }] : []))] as const;
+      }),
+    ),
+  );
+  const zip = Object.keys(finals).length ? await downloadUrl(paths.final(pack.id, PACK_ZIP), zipName(pack.app?.name)) : null;
   const { data: app } = await db.from("apps").select("listing_json").eq("id", pack.app_id).single();
   const listing = Listing.safeParse(app?.listing_json);
   const images = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
@@ -65,13 +83,22 @@ export async function GET(_req: Request, { params }: Params) {
       rules_status: o.rules_status,
       draft_url: o.draft_url ? urls[o.draft_url] ?? null : null,
       timeline: o.timeline_json,
+      finals: finals[o.id] ?? [],
       rules: (rules ?? []).filter((r) => r.output_id === o.id).map(({ output_id: _, ...r }) => r),
       stills: stillPaths(o).flatMap(({ still, path }) =>
         urls[path] ? [{ id: still.id, label: still.label, size: `${still.width}×${still.height}`, fileName: still.fileName, url: urls[path] }] : [],
       ),
     })),
     images,
+    checkout: checkoutOpen(),
+    zip,
   });
+}
+
+/** "Royal Match" -> "royal-match-trailerly.zip". */
+function zipName(appName: string | undefined): string {
+  const slug = (appName ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  return `${slug || "app"}-trailerly.zip`;
 }
 
 const Patch = z.union([
@@ -87,6 +114,8 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const parsed = Patch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid" }, { status: 400 });
+
+  if (pack.status !== "draft") return NextResponse.json({ error: "This pack is paid for, so it's locked." }, { status: 409 });
 
   const db = supabaseAdmin();
   if ("brief" in parsed.data) {
