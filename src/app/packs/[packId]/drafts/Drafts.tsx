@@ -77,10 +77,10 @@ export function Drafts({ packId }: { packId: string }) {
 
   return (
     <>
-      <TopBar step="Drafts" />
+      <TopBar step={pack?.status === "ready" ? "Download" : finalsBusy(pack?.status ?? "draft") ? "Pay" : "Drafts"} />
       <main className="wrap" style={{ paddingTop: 32, paddingBottom: 120 }}>
         {error && <p role="alert">{error}</p>}
-        <PageHead app={pack?.app ?? null} step={5} title="Your drafts">
+        <PageHead app={pack?.app ?? null} step={pack?.status === "ready" ? 8 : 5} title={pack?.status === "ready" ? "Your pack" : "Your drafts"}>
           <div style={{ display: "grid", gap: 8, minWidth: 280 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "var(--tx)" }}>
               <span>{ready} of {expected.length} ready</span>
@@ -91,6 +91,30 @@ export function Drafts({ packId }: { packId: string }) {
             </span>
           </div>
         </PageHead>
+
+        {finals.length > 0 && (
+          <section id="downloads" className="card rise" style={{ marginTop: 28, display: "grid", gap: 14 }}>
+            <div>
+              <span className="lab" style={{ color: "var(--lime)" }}><span className="dot" />Your pack</span>
+              <p className="disp" style={{ margin: "8px 0 0", fontSize: 32 }}>Full size, no watermark</p>
+              <p className="mu" style={{ margin: "6px 0 0", fontSize: 14 }}>Each file is named for its slot in App Store Connect.</p>
+            </div>
+            {pack?.zip && (
+              <a className="btn btn-light" href={pack.zip} style={{ justifySelf: "start" }}>
+                Download all (.zip, with a sheet of where each file goes)
+              </a>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+              {finals.map((f) => (
+                <a key={f.fileName} href={f.url} download={f.fileName} style={{ display: "grid", gap: 4, padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 12, color: "inherit", textDecoration: "none", minWidth: 0 }}>
+                  <span style={{ fontWeight: 700 }}>{f.label} ↓</span>
+                  <span className="mono mu" style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
 
         <h2 className="lab mu rise" style={{ margin: "22px 0 12px", display: "flex", gap: 10, alignItems: "center" }}>
           App Store
@@ -188,29 +212,6 @@ export function Drafts({ packId }: { packId: string }) {
             </div>
           ))}
         </div>
-
-        {finals.length > 0 && (
-          <section id="downloads" className="card rise" style={{ marginTop: 36, display: "grid", gap: 14 }}>
-            <div>
-              <span className="lab" style={{ color: "var(--lime)" }}><span className="dot" />Your pack</span>
-              <p className="disp" style={{ margin: "8px 0 0", fontSize: 32 }}>Full size, no watermark</p>
-              <p className="mu" style={{ margin: "6px 0 0", fontSize: 14 }}>Each file is named for its slot in App Store Connect.</p>
-            </div>
-            {pack?.zip && (
-              <a className="btn btn-light" href={pack.zip} style={{ justifySelf: "start" }}>
-                Download all (.zip, with a sheet of where each file goes)
-              </a>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-              {finals.map((f) => (
-                <a key={f.fileName} className="btn btn-ghost" href={f.url} download={f.fileName} style={{ justifyContent: "space-between", gap: 10 }}>
-                  <span style={{ fontWeight: 700 }}>{f.label}</span>
-                  <span className="mono mu" style={{ fontSize: 11 }}>{f.fileName} ↓</span>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
 
         {selected && (
           <Detail
