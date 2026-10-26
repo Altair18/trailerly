@@ -7,7 +7,7 @@ import { useBrandFonts } from "../fonts";
 import { DEFAULT_LOOK, LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
 import { type Brand, DISPLAY, ENTER_FRAMES, INK, PINK } from "./parts";
 import { BrandHeaderOverlay, BrandHeaderScene, heldHeaderLine, BrandSearchOverlay, BrandSearchScene } from "./Brand";
-import { PORTRAIT_SWAP, PortraitBrand, PortraitCard, PortraitEnd, PortraitLine, PortraitShot, PortraitStage } from "./Portrait";
+import { END_CARD_SECONDS, PORTRAIT_SWAP, PortraitBrand, PortraitCard, PortraitEnd, PortraitLine, PortraitShot, PortraitStage } from "./Portrait";
 
 export type { Brand } from "./parts";
 
@@ -134,6 +134,8 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
  */
 export function afterLanding(seg: Segment, base: Segment[], fps: number): number {
   const from = Math.round(seg.start * fps);
+  // A short close is all end card, which covers the card at once: nothing to wait for.
+  if (seg.duration < END_CARD_SECONDS + 1) return from;
   const card = base.find((b) => b.type === "screenshot" && b.start <= seg.start + 0.01 && b.start + b.duration > seg.start);
   if (!card) return from;
   const landed = Math.round(card.start * fps) + PORTRAIT_SWAP + 6;

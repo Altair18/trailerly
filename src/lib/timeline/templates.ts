@@ -205,6 +205,7 @@ export function buildFromTemplate(
   const shots = new Set((ctx.screenshots ?? []).map((s) => s.id));
   const canScreenshot = spec.allowedSegments.includes("screenshot");
 
+  fill = { ...fill, beats: noRepeatedScreenshots(template, fill, shots) };
   const opening = hookLine(ctx.hook ?? fill.beats[0]?.caption ?? "");
   const captions = template.beats.map((b, i) => (b.caption ? tidyCaption(fill.beats[i]!.caption ?? "") : ""));
   template.beats.forEach((b, i) => {
@@ -223,7 +224,9 @@ export function buildFromTemplate(
   const useEndCard = template.endCard && spec.allowedSegments.includes("end_card") && !!fill.cta?.trim();
   const cta = useEndCard ? tidyCaption(fill.cta!) : "";
   // Portrait videos end on a reason to install under the app's name, not just the name.
-  const closing = !useEndCard && !isLandscape(spec) && fill.closing_line?.trim() ? tidyCaption(fill.closing_line) : "";
+  const closingLine = !useEndCard && !isLandscape(spec) && fill.closing_line?.trim() ? tidyCaption(fill.closing_line) : "";
+  // A closing line that says again what an earlier line said is dropped: the end card then shows the name alone.
+  const closing = closingLine && sharedWords(closingLine, [opening, ...captions]).length === 0 ? closingLine : "";
 
   // Stills never hold past a few seconds, unless the video would come out under the spec's minimum.
   const stillBeats = template.beats.length - (useEndCard ? 1 : 0);
@@ -314,6 +317,39 @@ export function buildFromTemplate(
   return { timeline: { segments: [...segments, ...overlays], template: template.id }, errors: [] };
 }
 
+const STOP = new Set(["your", "with", "every", "that", "this", "from", "into", "more", "than", "what", "when", "have", "just", "them", "they", "will", "about", "again", "today", "never", "always"]);
+const keyWords = (line: string) =>
+  line
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !STOP.has(w))
+    .map((w) => w.replace(/(ies|es|s)$/, ""));
+
+/** Key words of `line` (4+ letters, not filler, singular) that already appear in any of `others`. */
+export function sharedWords(line: string, others: string[]): string[] {
+  const seen = new Set(others.flatMap(keyWords));
+  return keyWords(line).filter((w) => seen.has(w));
+}
+
+/**
+ * A screenshot the model put in two beats is swapped, in its later beat, for one not used yet (the close is left:
+ * the end card covers it). With no unused screenshot left, the repeat stays.
+ */
+export function noRepeatedScreenshots(template: CutTemplate, fill: TemplateFill, shots: Set<string>): TemplateFill["beats"] {
+  const used = new Set(fill.beats.map((b) => b.source));
+  const spare = [...shots].filter((id) => !used.has(id));
+  const seen = new Set<string>();
+  return fill.beats.map((b, i) => {
+    const repeat = shots.has(b.source) && seen.has(b.source) && template.beats[i]?.role !== "close";
+    seen.add(b.source);
+    if (!repeat || spare.length === 0) return b;
+    const source = spare.shift()!;
+    seen.add(source);
+    return { ...b, source };
+  });
+}
+
 /**
  * Move a cut that lands within POSTER_CLEAR of the poster second to just outside it, taking the time from one
  * neighbouring beat and giving it to the other, as long as both still have the time and footage for it.
@@ -346,13 +382,16 @@ login screen). Match each beat's note. Prefer high-interest clips, and use each 
 too few. Start clips after any dead_time (frozen, loading or black stretches) by setting offset. Never use a clip
 marked personal_info unless nothing else fits. Use screenshots only when the clips run out or are private.
 
+Use each screenshot at most once: never show the same screen twice.
+
 Captions: 2 to ${CAPTION_WORDS} words, plain and punchy, in the brief's tone. Each one names what the viewer gets in that
 beat, not what the screen shows ("Know every plant by name", not "Plant identification screen"). Feature beats are
 benefits; a payoff beat is life after the app ("Your plants, thriving"). Never copy the listing, and never repeat the
-words of the hook or of a screenshot's own headline.
+words of the hook or of a screenshot's own headline. Say each idea once: no key word (other than the app's name) may
+appear in more than one line of the whole video, the hook and closing line included.
 If no hook is given, the first beat's caption is the opening hook line and must name the viewer's problem or the
-result they want. For the App Store preview, add "closing_line": 2 to ${CAPTION_WORDS} words shown under the app's
-name at the end, the reason to install, often echoing the hook ("Never lose a plant again"). For social ads with an
+result they want. For the App Store preview, add "closing_line": 2 to ${CAPTION_WORDS} words shown on the end card under the
+app's name: a call to action in new words, never a repeat of the hook ("Free to play", "Start your streak today"). For social ads with an
 end card, add "cta": a short call to action (e.g. "Download free today").
 
 Return JSON: {"template_id": "...", "beats": [...], "closing_line": "...", "cta": "..."}.`;

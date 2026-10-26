@@ -24,22 +24,27 @@ describe("agency script: hook, benefits, payoff, closing line", () => {
       { source: "clip_2", offset: 4, caption: "Your plants, thriving" },
       { source: "clip_1", offset: 6 },
     ],
-    closing_line: "Never lose a plant again",
+    closing_line: "Start growing today",
   };
   const built = buildFromTemplate(templateById("promise-tour")!, fill, spec, { hook: "Stop guessing when to water", clips });
 
-  it("runs 24-30 s and passes the preview spec", () => {
+  it("runs about 19 s and passes the preview spec", () => {
     expect(built.timeline).not.toBeNull();
     const t = built.timeline!;
     const end = Math.max(...t.segments.map((s) => s.start + s.duration));
-    expect(end).toBeGreaterThanOrEqual(24);
-    expect(end).toBeLessThanOrEqual(30);
+    expect(end).toBeGreaterThanOrEqual(17);
+    expect(end).toBeLessThanOrEqual(21);
     expect(enforceSpec(t, spec)).toEqual([]);
   });
 
   it("ends on the closing line under the app's name", () => {
     const close = built.timeline!.segments.find((s) => s.style === "brand");
-    expect(close?.text).toBe("Never lose a plant again");
+    expect(close?.text).toBe("Start growing today");
+  });
+
+  it("drops a closing line that repeats an earlier line's words", () => {
+    const echo = buildFromTemplate(templateById("promise-tour")!, { ...fill, closing_line: "Never lose a plant again" }, spec, { hook: "Stop guessing when to water", clips });
+    expect(echo.timeline!.segments.find((s) => s.style === "brand")?.text).toBeUndefined();
   });
 
   it("never cuts within half a second of the 5 s poster frame", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { noRepeatedScreenshots, sharedWords, templateById } from "@/lib/timeline/templates";
 import { headerHeadline, headerLayout, headlineSize, splitHeadline, splitLines } from "@/remotion/compositions/Brand";
 
 describe("even caption lines", () => {
@@ -27,5 +28,21 @@ describe("header line", () => {
     expect(size).toBeGreaterThan(before * 1.4);
     // Three lines plus the wordmark still fit the safe box's height.
     expect(size * 3 * 1.12).toBeLessThan(L.text.height * 0.85);
+  });
+});
+
+describe("say each thing once", () => {
+  it("finds key words shared between lines, ignoring filler and plurals", () => {
+    expect(sharedWords("Unlock your royal boosters", ["Ready to unlock your next booster?"])).toEqual(["unlock", "booster"]);
+    expect(sharedWords("Free to play", ["Match tiles, save the king"])).toEqual([]);
+  });
+  it("swaps a screenshot shown twice for one not used yet", () => {
+    const t = templateById("promise-tour")!;
+    const beats = noRepeatedScreenshots(
+      t,
+      { template_id: t.id, beats: ["s1", "s2", "s3", "s1", "s4", "s1"].map((source) => ({ source })) },
+      new Set(["s1", "s2", "s3", "s4", "s5"]),
+    );
+    expect(beats.map((b) => b.source)).toEqual(["s1", "s2", "s3", "s5", "s4", "s1"]);
   });
 });
