@@ -99,6 +99,11 @@ export function paletteFrom(rgb: Uint8Array, genre?: string | null): BrandStyle 
   const main = ranked[0];
   if (!main || main.weight < 1) return NEUTRAL(font);
   const second = ranked.find((b) => hueGap(b.h, main.h) >= 40 && b.weight >= main.weight * 0.15);
+  // Gold on blue or purple (a crown, a coin, a star on a royal field): the gold is the accent, the cool colour the
+  // brand's field. Darkened gold goes muddy brown, so the cool hue takes the backdrop and the gold the highlight.
+  const warmGold = main.h >= 25 && main.h <= 75;
+  const cool = ranked.find((b) => b.h >= 180 && b.h <= 300 && b.weight >= main.weight * 0.2);
+  if (warmGold && cool) return styleFromHues(cool, main.h, font);
   return styleFromHues(main, second ? second.h : null, font);
 }
 

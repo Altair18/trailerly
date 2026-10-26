@@ -233,6 +233,15 @@ export function headerLayout(width: number, height: number, safe?: SafeArea): He
   return { text, hero, sides };
 }
 
+/**
+ * The header holds one line for its whole loop (the hook, under the wordmark): top apps' headers read as a calm
+ * banner, not a slideshow. Every other overlay is dropped. Cards beyond the hero's neighbours hold still.
+ */
+export function heldHeaderLine<T extends { start: number; duration: number; style?: string; text?: string }>(overlays: T[], total: number): T[] {
+  const line = overlays.find((o) => o.style === "hook" && o.text?.trim()) ?? overlays.find((o) => o.style !== "brand" && o.text?.trim());
+  return line ? [{ ...line, start: 0, duration: total }] : overlays;
+}
+
 export function BrandHeaderScene({ shots, width, height, safe, brand }: { shots: SceneShot[]; width: number; height: number; safe?: SafeArea; brand?: Brand }) {
   const S = brandStyleOf(brand);
   const L = headerLayout(width, height, safe);
@@ -245,7 +254,10 @@ export function BrandHeaderScene({ shots, width, height, safe, brand }: { shots:
         <>
           {unique > 1 &&
             L.sides.map(({ box, offset }) => (
-              <Card key={offset} box={box} shots={shots} pick={(i) => i + offset} radius={Math.round(box.width * 0.07)} shadow={cardShadow(height)} dim={0.68} dimColour={S.bgDeep} />
+              <Card key={offset} box={box} shots={shots} pick={Math.abs(offset) === 1 ? (i) => i + offset : () => offset}
+                radius={Math.round(box.width * 0.07)}
+                shadow={cardShadow(height)}
+                dim={Math.abs(offset) === 1 ? 0.7 : 0.84} dimColour={S.bgDeep} />
             ))}
           <Card box={L.hero} shots={shots} pick={(i) => i} radius={radius} shadow={`${cardShadow(height)}, 0 0 0 ${Math.max(2, Math.round(height * 0.003))}px rgba(255,255,255,.12)`} />
         </>

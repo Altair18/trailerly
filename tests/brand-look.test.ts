@@ -95,3 +95,21 @@ describe("soundtrack", () => {
     expect(soundtrackFor(manifest, "Finance", "p1").whoosh).toBe("music/whoosh.mp3");
   });
 });
+
+describe("gold on a royal field", () => {
+  it("puts a gold icon's blue or purple on the backdrop and the gold in the highlight", async () => {
+    const { paletteFrom: pf, toHsl: hsl } = await import("@/lib/media/palette");
+    // 60% gold crown, 40% royal purple-blue field.
+    const px: number[] = [];
+    for (let i = 0; i < 600; i++) px.push(245, 190, 30);
+    for (let i = 0; i < 400; i++) px.push(70, 60, 200);
+    const p = pf(new Uint8Array(px), "Games");
+    const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+    const [bgHue] = hsl(...hex(p.bg));
+    const [hiHue] = hsl(...hex(p.highlight));
+    expect(bgHue).toBeGreaterThan(200);
+    expect(bgHue).toBeLessThan(290);
+    expect(hiHue).toBeGreaterThan(30);
+    expect(hiHue).toBeLessThan(60);
+  });
+});

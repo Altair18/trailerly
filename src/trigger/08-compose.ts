@@ -14,6 +14,9 @@ import { DRAFT_SCALE, isLandscape, OUTPUT_SPECS, type OutputSpecId } from "@/lib
 import { stillSecond, stillsFor } from "@/lib/specs/stills";
 import { paths, signedUrls, uploadFile } from "@/lib/storage";
 import { Timeline } from "@/lib/timeline/schema";
+import { snapCutsToBeats } from "@/lib/timeline/beats";
+import { type MotionFrames, motionFrames, withFocus } from "@/lib/media/motion";
+import { POSTER_SECOND } from "@/lib/timeline/templates";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { FinalPayload } from "./payload";
 
@@ -70,7 +73,25 @@ export const compose = task({
         await db.from("outputs").update({ status: "rendering", error: null }).eq("id", output.id);
         try {
           const file = join(dir, `${id}.mp4`);
-          const timeline = Timeline.parse(output.timeline_json);
+          let timeline = Timeline.parse(output.timeline_json);
+          // The preview cuts on its music's beat (never next to the 5 s poster frame).
+          if (id === "preview" && soundtrack.beats) {
+            const clipSeconds = Object.fromEntries(clips.map((c) => [c.id, c.duration]));
+            timeline = snapCutsToBeats(timeline, soundtrack.beats, { clipSeconds, avoid: { at: POSTER_SECOND, clear: 0.5 } });
+          }
+          // Recording shots in the preview push in slowly on where the action is. Best-effort: no focus, no push.
+          if (id === "preview") {
+            const used = [...new Set(timeline.segments.flatMap((s) => (s.type === "screen" && s.clip_id ? [s.clip_id] : [])))];
+            const motion: Record<string, MotionFrames> = {};
+            for (const clipId of used) {
+              try {
+                if (clipUrls[clipId]) motion[clipId] = await motionFrames(clipUrls[clipId]!);
+              } catch (err) {
+                logger.warn("Couldn't read motion; that shot won't push in", { packId, clipId, error: errorText(err) });
+              }
+            }
+            timeline = withFocus(timeline, motion);
+          }
           const props = {
             timeline,
             clipUrls,

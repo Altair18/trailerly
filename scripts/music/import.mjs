@@ -8,6 +8,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, parse, resolve } from "node:path";
+import { gridOf } from "./beats.mjs";
 
 const IN = resolve(process.argv[2] ?? "music");
 const OUT = join(process.cwd(), "public", "music");
@@ -41,7 +42,8 @@ for (const bed of BEDS) {
     "-ar", "44100", "-ac", "2", "-b:a", "192k", join(OUT, `${bed.id}.mp3`),
   ]);
   console.log(`+ ${bed.id} <- ${src}`);
-  manifest.beds.push({ id: bed.id, file: `music/${bed.id}.mp3`, moods: bed.moods });
+  // The beat grid lets the preview cut on the beat.
+  manifest.beds.push({ id: bed.id, file: `music/${bed.id}.mp3`, moods: bed.moods, ...gridOf(join(OUT, `${bed.id}.mp3`)) });
 }
 for (const id of EFFECTS) {
   if (existsSync(join(OUT, `${id}.mp3`))) manifest.effects.push({ id, file: `music/${id}.mp3` });

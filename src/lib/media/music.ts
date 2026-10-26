@@ -1,8 +1,14 @@
 // The music library (free Pixabay beds imported by scripts/music/import.mjs, ffmpeg-made effects) shipped in public/music. Pure: the
 // manifest is passed in, so the planner and tests can use it without the files.
 
+/** A bed's beat grid (scripts/music/beats.mjs): beats per minute and the time of the first beat in seconds. */
+export interface BeatGrid {
+  bpm: number;
+  beat0: number;
+}
+
 export interface MusicManifest {
-  beds: Array<{ id: string; file: string; moods: string[] }>;
+  beds: Array<{ id: string; file: string; moods: string[] } & Partial<BeatGrid>>;
   effects: Array<{ id: string; file: string }>;
 }
 
@@ -11,6 +17,8 @@ export interface Soundtrack {
   bed?: string;
   whoosh?: string;
   pop?: string;
+  /** The bed's beats, so cuts can land on them. */
+  beats?: BeatGrid;
 }
 
 const GENRE_MOODS: Array<[RegExp, string[]]> = [
@@ -36,5 +44,7 @@ export function soundtrackFor(manifest: MusicManifest | null, genre: string | nu
   const fit = manifest.beds.filter((b) => b.moods.some((m) => moods.includes(m)));
   const pool = fit.length ? fit : manifest.beds;
   const effect = (id: string) => manifest.effects.find((e) => e.id === id)?.file;
-  return { bed: pool[hash(seed) % pool.length]!.file, whoosh: effect("whoosh"), pop: effect("pop") };
+  const bed = pool[hash(seed) % pool.length]!;
+  const beats = bed.bpm && bed.beat0 !== undefined ? { bpm: bed.bpm, beat0: bed.beat0 } : undefined;
+  return { bed: bed.file, whoosh: effect("whoosh"), pop: effect("pop"), ...(beats ? { beats } : {}) };
 }

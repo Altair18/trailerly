@@ -10,6 +10,8 @@ import { OUTPUT_SPECS } from "@/lib/specs/outputs";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { buildFromTemplate, templateById } from "@/lib/timeline/templates";
 import { cropScreenshotHeadlines } from "@/lib/timeline/headlines";
+import { snapCutsToBeats } from "@/lib/timeline/beats";
+import { motionFrames, withFocus } from "@/lib/media/motion";
 
 // Renders the App Store preview in each look, from store screenshots and from the demo recording.
 const D = process.env.DEMO_DIR!;
@@ -100,7 +102,16 @@ it("renders the preview looks", async () => {
   const url = (f: string) => `http://localhost:4558/${f}`;
   const accent = await iconAccent(join(D, "icon.png"));
   JSON.parse(readFileSync(join(D, "clips.json"), "utf8"));
-  const timelines = process.env.SCRIPT ? scripted() : { shots, recording };
+  let timelines = process.env.SCRIPT ? scripted() : { shots, recording };
+  const sound = process.env.SOUND ? soundtrackFor(JSON.parse(readFileSync("public/music/manifest.json", "utf8")), process.env.GENRE, "demo") : undefined;
+  if (process.env.SCRIPT && sound?.beats) {
+    // As compose does it: cuts on the beat, and recording shots pushed in on the action.
+    const clipSeconds = Object.fromEntries((JSON.parse(readFileSync(join(D, "clips.json"), "utf8")) as { id: string; duration: number }[]).map((c) => [c.id, c.duration]));
+    const motion = Object.fromEntries(await Promise.all(["clip_1", "clip_2", "clip_3"].map(async (c) => [c, await motionFrames(join(D, `${c}.mp4`))] as const)));
+    timelines = Object.fromEntries(
+      Object.entries(timelines).map(([k, t]) => [k, withFocus(snapCutsToBeats(t, sound.beats!, { clipSeconds, avoid: { at: 5, clear: 0.5 } }), motion)]),
+    ) as typeof timelines;
+  }
   if (process.env.SCRIPT) console.log(JSON.stringify(timelines, null, 1));
   for (const [name, timeline] of Object.entries(timelines)) {
     if (process.env.ONLY && process.env.ONLY !== name) continue;
@@ -118,7 +129,7 @@ it("renders the preview looks", async () => {
           baseHeight: spec.height,
           brand: { name: "Sprout", iconUrl: url("icon.png"), accent, style: await iconStyle(join(D, "icon.png"), process.env.GENRE) },
           scale: SCALE,
-          soundtrack: process.env.SOUND ? soundtrackFor(JSON.parse(readFileSync("public/music/manifest.json", "utf8")), process.env.GENRE, "demo") : undefined,
+          soundtrack: sound,
           look,
         },
       });
