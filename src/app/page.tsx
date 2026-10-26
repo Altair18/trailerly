@@ -3,7 +3,7 @@ import { ExampleGrid } from "@/components/landing/ExampleGrid";
 import { Hero } from "@/components/landing/Hero";
 import { LinkBar } from "@/components/landing/LinkBar";
 import { Comet } from "@/components/landing/Comet";
-import { Gecko } from "@/components/landing/Gecko";
+import { Dragon } from "@/components/landing/Dragon";
 import { Compare } from "@/components/landing/Compare";
 import { CHECKOUT_LIVE, PRICES } from "@/components/landing/pricing";
 import { RecordingToPack } from "@/components/landing/RecordingToPack";
@@ -99,7 +99,7 @@ export default function Home() {
 
       <main className="lp-main">
         <Comet />
-        <Gecko />
+        <Dragon />
         <Hero />
         <LinkBar />
 

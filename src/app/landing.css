@@ -248,9 +248,9 @@
 @keyframes lp-trail { to { stroke-dashoffset: -1000; } }
 @media (max-width: 899px), (prefers-reduced-motion: reduce) { .lp-comet { display: none; } }
 
-/* Gecko visitor: scurries in from the side now and then; runs off when hovered or tapped. */
-.lp-gecko-layer { position: absolute; inset: 0; z-index: 16; pointer-events: none; }
-.lp-gecko { position: absolute; left: 0; top: 0; display: none; width: 300px; height: 300px; pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55)); will-change: transform; }
-.lp-gecko svg { display: block; overflow: visible; }
-.lp-gecko .hit { pointer-events: all; cursor: pointer; touch-action: manipulation; }
-@media (prefers-reduced-motion: reduce) { .lp-gecko-layer { display: none; } }
+/* Bearded dragon visitor: walks onto a card to bask now and then; runs off when hovered or tapped. */
+.lp-dragon-layer { position: absolute; inset: 0; z-index: 16; pointer-events: none; }
+.lp-dragon { position: absolute; left: 0; top: 0; display: none; width: 600px; height: 600px; pointer-events: none; filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.5)); will-change: transform; }
+.lp-dragon svg { display: block; overflow: visible; }
+.lp-dragon .hit { pointer-events: all; cursor: pointer; touch-action: manipulation; }
+@media (prefers-reduced-motion: reduce) { .lp-dragon-layer { display: none; } }
