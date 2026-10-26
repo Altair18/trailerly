@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const DESCRIPTION =
@@ -15,18 +16,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#050507", colorScheme: "dark" };
 
-const FONTS =
-  "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap";
+// Fonts are downloaded at build time and served from our own domain: no render-blocking request to Google,
+// and visitors' browsers never contact Google Fonts.
+const display = Archivo({ subsets: ["latin", "latin-ext"], axes: ["wdth"], display: "swap", variable: "--f-display" });
+const ui = Geist({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--f-ui" });
+const mono = Geist_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap", variable: "--f-mono" });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link rel="stylesheet" href={FONTS} />
-      </head>
+    <html lang="en" className={`${display.variable} ${ui.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

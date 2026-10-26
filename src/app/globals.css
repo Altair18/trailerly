@@ -15,9 +15,9 @@
   --mint: #2ee6a6;
   --coral: #ff5a4e;
   --ink: #0a0a0e;
-  --display: "Archivo", sans-serif;
-  --ui: "Geist", system-ui, sans-serif;
-  --mono: "Geist Mono", ui-monospace, monospace;
+  --display: var(--f-display), "Archivo", sans-serif;
+  --ui: var(--f-ui), "Geist", system-ui, sans-serif;
+  --mono: var(--f-mono), "Geist Mono", ui-monospace, monospace;
   color-scheme: dark;
 
   /* shadcn / Tailwind names from the style guide, so components can use either. */

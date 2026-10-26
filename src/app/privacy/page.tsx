@@ -32,7 +32,6 @@ export default function Privacy() {
         <li><b>Trigger.dev</b> runs the background jobs that cut and render your videos.</li>
         <li><b>AI video providers</b> may make the short AI scenes some header and search videos include. Every AI scene is labelled in your rules check.</li>
         <li><b>Stripe</b> will handle payments when checkout opens. We never see your card details.</li>
-        <li><b>Google Fonts</b> serves the fonts on this site, which means your browser asks Google for them.</li>
       </ul>
 
       <h2>Your choices</h2>
