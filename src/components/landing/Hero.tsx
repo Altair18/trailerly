@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { HeroScene, type SceneKey } from "./HeroScene";
 import { SideReels } from "./SideReels";
 
 const SLIDES = [
   {
     tag: "Now showing",
+    scene: "premiere" as SceneKey,
     title: "A trailer for your app",
     sub: "One App Store link and one screen recording become App Store videos sized for every slot, each checked against Apple's rules.",
     cta: "Make my pack",
@@ -19,6 +21,7 @@ const SLIDES = [
   },
   {
     tag: "iOS 27 ready",
+    scene: "ocean" as SceneKey,
     title: "Header and search videos",
     sub: "Apple's new 21:9 header and 3:2 search videos, plus matching stills, with your text kept inside every device crop.",
     cta: "Start with my link",
@@ -31,6 +34,7 @@ const SLIDES = [
   },
   {
     tag: "A/B ready",
+    scene: "rainforest" as SceneKey,
     title: "Hooks written from your reviews",
     sub: "Pick a headline from 10 hooks mined from what users already say. Extra picks become B and C variants to test.",
     cta: "Write my hooks",
@@ -177,6 +181,7 @@ export function Hero() {
           onDragStart={(e) => e.preventDefault()}
         >
           <div className="kb flow" style={{ backgroundImage: s.bg }} />
+          <HeroScene scene={s.scene} />
           <div className="lp-phones" aria-hidden="true">
             <div className="lp-phone bob">
               <div style={{ background: s.screen }}><span className="disp">{s.hook}</span></div>
