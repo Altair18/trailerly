@@ -65,10 +65,16 @@ export const renderFinal = task({
     const chosen = ChosenHooks.parse(pack.chosen_hooks ?? { social: [], headline: null });
     const specs = draftSpecsFor(variantHooks(chosen, (pack.hooks_json ?? []) as Hook[]));
     await setPackStatus(packId, "rendering");
+    // A retry after a partial failure only renders what's still missing.
+    const { data: done } = await supabaseAdmin().from("outputs").select("spec").eq("pack_id", packId).not("final_url", "is", null);
+    const already = specs.filter((s) => done?.some((o) => o.spec === s));
+    const todo = specs.filter((s) => !already.includes(s));
     // Full size is slow (the header is 3840 wide), so each output renders on its own machine at the same time
     // rather than one after another, which could run past the task's hour.
-    const batch = await compose.batchTriggerAndWait(specs.map((id) => ({ payload: { packId, specs: [id], final: true } })));
-    const rendered = batch.runs.flatMap((r) => (r.ok ? r.output.rendered : []));
+    const batch = todo.length
+      ? await compose.batchTriggerAndWait(todo.map((id) => ({ payload: { packId, specs: [id], final: true } })))
+      : { runs: [] };
+    const rendered = [...already, ...batch.runs.flatMap((r) => (r.ok ? r.output.rendered : []))];
     const failed = specs.filter((s) => !rendered.includes(s));
     // The zip is a convenience on top of the single files, so its failure doesn't fail the pack.
     const zipped = await packagePack.triggerAndWait({ packId, specs: rendered });
