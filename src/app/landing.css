@@ -314,3 +314,32 @@
   .lp-sc-fmt button { padding: 8px 10px; font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .lp-sc-mock .phone { animation: none; } .lp-sc-stage { transition: none; } }
+
+/* Hero scenes (HeroScene.tsx): layered SVG on the left, fading into the slide gradient. Layers shift with
+   the tilt for depth. No filters or blend modes here (they made Chrome on Windows flicker under the tilt). */
+.lp-scene { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 36%, transparent 80%); mask-image: linear-gradient(90deg, #000 0%, #000 36%, transparent 80%); }
+.lp-scene .d1 { transform: translate(calc(var(--tx, 0) * -8px), calc(var(--ty, 0) * -5px)); }
+.lp-scene .d2 { transform: translate(calc(var(--tx, 0) * -16px), calc(var(--ty, 0) * -10px)); }
+.lp-scene .d3 { transform: translate(calc(var(--tx, 0) * -30px), calc(var(--ty, 0) * -18px)); }
+.lp-sway { transform-box: fill-box; transform-origin: 0% 100%; animation: lp-sway 7s ease-in-out infinite alternate; }
+.lp-sway.top { transform-origin: 0% 0%; animation-duration: 9s; }
+@keyframes lp-sway { from { transform: rotate(-1.4deg); } to { transform: rotate(1.4deg); } }
+.lp-vine { transform-box: fill-box; transform-origin: 50% 0%; animation: lp-vine 6s ease-in-out infinite alternate; }
+@keyframes lp-vine { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+.lp-twinkle { animation: lp-twinkle 2.4s ease-in-out infinite alternate; }
+@keyframes lp-twinkle { to { opacity: 0.35; } }
+.lp-drift { animation: lp-drift 9s linear infinite; }
+.lp-drift.slow { animation-duration: 16s; }
+@keyframes lp-drift { to { transform: translateX(-200px); } }
+.lp-beam { transform-box: view-box; transform-origin: 48% 100%; animation: lp-beam 8s ease-in-out infinite alternate; }
+@keyframes lp-beam { from { transform: rotate(-6deg); } to { transform: rotate(5deg); } }
+.lp-bob { animation: lp-bob 4s ease-in-out infinite alternate; }
+@keyframes lp-bob { to { transform: translateY(-10px); } }
+.lp-pulse { transform-box: fill-box; transform-origin: center; animation: lp-pulse 6s ease-in-out infinite alternate; }
+@keyframes lp-pulse { to { transform: scale(1.06); opacity: 0.85; } }
+@media (max-width: 640px) {
+  .lp-scene { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 45%, rgba(0, 0, 0, 0.4) 100%); mask-image: linear-gradient(180deg, #000 0%, #000 45%, rgba(0, 0, 0, 0.4) 100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-sway, .lp-vine, .lp-twinkle, .lp-drift, .lp-beam, .lp-bob, .lp-pulse { animation: none; }
+}
