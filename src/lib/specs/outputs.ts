@@ -93,8 +93,9 @@ const BASE_SPECS = {
     minScreenShare: 0,
     loop: false,
     fileName: "appstore-preview-886x1920.mp4",
-    // Agency previews run 25-30 s; the beats' caps keep a cut from dragging when footage is short.
-    targetSeconds: 27,
+    // Tight beat on store screenshots: about five 3 s shots and a 2.4 s end card, no shot shown twice. (Agency
+    // previews built from long recordings run 25-30 s; ours read as dragging at 24 s with repeated stills.)
+    targetSeconds: 19,
   },
   header: {
     id: "header",

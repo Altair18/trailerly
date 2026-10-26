@@ -70,6 +70,12 @@ export function splitLines(text: string, n: number): string[] {
   return best;
 }
 
+/** Font size at which every part fits on one line of `width` (no floor), up to `max`. */
+export function fitSize(parts: string[], font: BrandFont, width: number, max: number): number {
+  const longest = Math.max(6, ...parts.map((p) => p.length));
+  return Math.round(Math.min(max, width / (longest * GLYPH[font])));
+}
+
 /** Font size that sets each part of the headline on one line (or two, for long ones) within `width`. */
 export function headlineSize(parts: string[], font: BrandFont, width: number, max: number): number {
   const longest = Math.max(8, ...parts.map((p) => p.length));
@@ -369,7 +375,7 @@ export function BrandHeaderOverlay({
   const { size, lines } = headerHeadline(line, S.font, col.width, col.height);
   return (
     <div style={column}>
-      <Wordmark brand={brand} S={S} size={Math.round(col.height * 0.075)} />
+      <Wordmark brand={brand} S={S} size={Math.round(col.height * 0.1)} />
       <Headline text={line} S={S} size={size} lines={lines} />
     </div>
   );
@@ -380,7 +386,7 @@ export function BrandHeaderOverlay({
  * the narrow header column). Height is shared with the wordmark above it.
  */
 export function headerHeadline(text: string, font: BrandFont, width: number, height: number): { size: number; lines?: string[] } {
-  const room = height * 0.8;
+  const room = height * 0.74;
   const fit = (parts: string[]) => Math.min(width / (Math.max(6, ...parts.map((p) => p.length)) * GLYPH[font]), room / (parts.length * 1.12));
   const two = splitHeadline(text).filter(Boolean);
   const three = splitLines(text, 3);
@@ -506,7 +512,8 @@ export function BrandSearchOverlay({
   const line = text ?? "";
   return (
     <div style={column}>
-      <Headline text={line} S={S} size={headlineSize(splitHeadline(line), S.font, col.width, col.height * 0.42)} align="center" />
+      {/* Sized so each half sits on one line: two lines at most, leaving the cards their room. */}
+      <Headline text={line} S={S} size={fitSize(splitHeadline(line), S.font, col.width * 0.94, col.height * 0.42)} align="center" />
     </div>
   );
 }

@@ -345,8 +345,8 @@ export function PortraitLine({ text, look, accent, brand, width, height, first =
 export function PortraitBrand({ brand, text, look, width, height }: { brand?: Brand; text?: string; look: Look; width: number; height: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  if (look === "brand" && text?.trim()) return <BrandClose brand={brand} text={text} width={width} height={height} />;
-  const S = look === "brand" ? brandPortraitStyle(brand) : portraitStyle(look, brand?.accent ?? "#FF2E88");
+  if (look === "brand") return <BrandClose brand={brand} text={text?.trim() ?? ""} width={width} height={height} />;
+  const S = portraitStyle(look, brand?.accent ?? "#FF2E88");
   const L = portraitLayout(look, width, height);
   const rise = spring({ frame, fps, config: { damping: 18, stiffness: 120 } });
   const icon = Math.round(width * 0.15);
@@ -394,7 +394,7 @@ function BrandClose({ brand, text, width, height }: { brand?: Brand; text: strin
   const B = brandStyleOf(brand);
   const T = portraitLayout("brand", width, height).text;
   const endFrames = Math.round(END_CARD_SECONDS * fps);
-  const lineFirst = durationInFrames >= endFrames + fps;
+  const lineFirst = !!text && durationInFrames >= endFrames + fps;
   const endAt = lineFirst ? durationInFrames - endFrames : 0;
   const fade = interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
   return (
@@ -404,30 +404,45 @@ function BrandClose({ brand, text, width, height }: { brand?: Brand; text: strin
           <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.095)} align="center" />
         </div>
       )}
-      {frame >= endAt && <BrandEndCard brand={brand} line={lineFirst ? undefined : text} width={width} height={height} frame={frame - endAt} />}
+      {frame >= endAt && <BrandEndCard brand={brand} line={lineFirst ? undefined : text || undefined} width={width} height={height} frame={frame - endAt} cut={!lineFirst} />}
     </>
   );
 }
 
-function BrandEndCard({ brand, line, width, height, frame }: { brand?: Brand; line?: string; width: number; height: number; frame: number }) {
+function BrandEndCard({ brand, line, width, height, frame, cut }: { brand?: Brand; line?: string; width: number; height: number; frame: number; cut?: boolean }) {
   const { fps } = useVideoConfig();
   const B = brandStyleOf(brand);
-  const cover = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
+  // Straight after a shot (a cut on the beat), the card covers at once; after the closing line it fades in.
+  const cover = cut ? 1 : interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
   const pop = spring({ frame: frame - 4, fps, config: { damping: 16, stiffness: 120 } });
   const late = spring({ frame: frame - 12, fps, config: { damping: 18, stiffness: 120 } });
-  const icon = Math.round(width * 0.3);
+  // The boldest frame of the video: icon and name fill the middle of the screen.
+  const icon = Math.round(width * 0.4);
   const name = brand?.name ?? "";
   return (
     <AbsoluteFill style={{ opacity: cover }}>
       <BrandBackdrop S={B} width={width} height={height} light={{ x: width / 2, y: height * 0.42 }} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: width * 0.05, padding: "0 8%" }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: width * 0.055, padding: "0 7%" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "46%",
+            width: icon * 2.6,
+            height: icon * 2.6,
+            transform: `translate(-50%, -50%) scale(${0.6 + 0.4 * pop})`,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, ${withAlpha(B.highlight, 0.32)} 0%, transparent 65%)`,
+            opacity: pop,
+          }}
+        />
         <div style={{ opacity: pop, transform: `translateY(${(1 - pop) * width * 0.05}px) scale(${0.9 + 0.1 * pop})`, filter: `drop-shadow(0 ${width * 0.03}px ${width * 0.06}px rgba(0,0,0,.45))` }}>
           <AppIcon brand={brand} size={icon} />
         </div>
-        <div style={{ ...brandType(B.font), position: "relative", color: B.ink, textAlign: "center", lineHeight: 1.05, fontSize: headlineSize([name], B.font, width * 0.84, width * 0.13), opacity: pop }}>{name}</div>
+        <div style={{ ...brandType(B.font), position: "relative", color: B.ink, textAlign: "center", lineHeight: 1.05, fontSize: headlineSize([name], B.font, width * 0.86, width * 0.16), opacity: pop }}>{name}</div>
         {line?.trim() && (
           <div style={{ position: "relative", opacity: late }}>
-            <Headline text={line} S={B} size={headlineSize(splitHeadline(line), B.font, width * 0.84, width * 0.07)} align="center" />
+            <Headline text={line} S={B} size={headlineSize(splitHeadline(line), B.font, width * 0.84, width * 0.085)} align="center" />
           </div>
         )}
         <div
@@ -435,12 +450,12 @@ function BrandEndCard({ brand, line, width, height, frame }: { brand?: Brand; li
             ...UI,
             position: "relative",
             marginTop: width * 0.02,
-            padding: `${width * 0.022}px ${width * 0.06}px`,
+            padding: `${width * 0.028}px ${width * 0.075}px`,
             borderRadius: 999,
             background: B.highlight,
             color: B.bgDeep,
             fontWeight: 800,
-            fontSize: Math.round(width * 0.042),
+            fontSize: Math.round(width * 0.052),
             letterSpacing: "0.01em",
             opacity: late,
             transform: `translateY(${(1 - late) * width * 0.03}px)`,

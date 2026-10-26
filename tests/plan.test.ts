@@ -25,10 +25,10 @@ const good: Timeline = {
 };
 
 describe("fallbackPreview", () => {
-  it("passes the preview spec and trims to its 27 s target", () => {
+  it("passes the preview spec and trims to its 19 s target", () => {
     const t = fallbackPreview(clips, "Hello", OUTPUT_SPECS.preview);
     expect(enforceSpec(t, OUTPUT_SPECS.preview, clipSeconds)).toEqual([]);
-    expect(Math.max(...t.segments.map((s) => s.start + s.duration))).toBe(27);
+    expect(Math.max(...t.segments.map((s) => s.start + s.duration))).toBe(19);
   });
 });
 
