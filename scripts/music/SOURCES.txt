@@ -1,0 +1,13 @@
+Trailerly music beds: sources
+All tracks are from pixabay.com/music under the Pixabay Content License (free for commercial use, no attribution required).
+Save each download into C:\trailerly\music as <bed id>.mp3, then run: node scripts/music/import.mjs
+
+bed id          | track                                              | artist              | length | page
+bright-pop      | Happy Hustle                                       | GoldenSoundLabs     | 1:33   | https://pixabay.com/music/happy-childrens-tunes-happy-hustle-217432/
+calm-lofi       | Midnight Rhodes – Lo-Fi Hip Hop                    | VirtuAudio          | 2:56   | https://pixabay.com/music/lofi-midnight-rhodes-lo-fi-hip-hop-587326/
+tech-pulse      | Minimal Technology                                 | NastelBom           | 2:00   | https://pixabay.com/music/beats-minimal-technology-345194/
+acoustic-sun    | Happy Ukulele                                      | AtlasAudio          | 1:05   | https://pixabay.com/music/happy-childrens-tunes-happy-ukulele-617574/
+cinematic-rise  | Motivational Inspiring Piano                       | leberch             | 2:12   | https://pixabay.com/music/modern-classical-motivational-inspiring-piano-251921/
+energy-drive    | Energetic Action Sport                             | AlexGrohl           | 1:46   | https://pixabay.com/music/rock-energetic-action-sport-500409/
+game-bounce     | Marimba Game Music Playful Tropical Jungle Puzzle  | Denis-Pavlov-Music  | 2:31   | https://pixabay.com/music/video-games-marimba-game-music-playful-tropical-jungle-puzzle-399759/
+soft-corporate  | Soft Music                                         | NastelBom           | 2:31   | https://pixabay.com/music/ambient-soft-music-495878/
