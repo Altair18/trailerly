@@ -29,9 +29,11 @@ describe("iOS 27 pack", () => {
     expect(phone.left + phone.width).toBeLessThanOrEqual(box.left + box.width);
     expect(Math.abs(cy - (box.top + box.height / 2))).toBeLessThanOrEqual(1);
     const col = textBox(box, phone);
-    expect(col.left).toBe(box.left);
+    expect(col.left).toBeGreaterThan(box.left);
+    expect(col.top).toBeGreaterThan(box.top);
+    expect(col.top + col.height).toBeLessThan(box.top + box.height);
     expect(col.left + col.width).toBeLessThan(phone.left);
-    expect(col.width).toBeGreaterThan(box.width * 0.4);
+    expect(col.width).toBeGreaterThan(box.width * 0.35);
   });
 
   it("builds a short header and search cut when the model fails", () => {

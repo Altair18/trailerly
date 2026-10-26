@@ -3,8 +3,8 @@ import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
-import { LandscapeCard, LandscapeOverlay, type SafeArea, Stage } from "./Landscape";
-import { AppIcon, type Brand, DISPLAY, INK, PUSH_IN, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
+import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Media, type SafeArea, type SceneShot } from "./Landscape";
+import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, RevealWords, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
 
 export type { Brand } from "./parts";
 
@@ -45,12 +45,30 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   return (
     <AbsoluteFill style={{ backgroundColor: INK }}>
       <div style={{ position: "absolute", left: 0, top: 0, width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: "top left", overflow: "hidden" }}>
-        {base.map((seg, i) => (
-          <Sequence key={`b${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
-            <SegmentView segment={seg} index={i} {...view} />
-          </Sequence>
-        ))}
-        {loop && base.length > 1 && durationInFrames > LOOP_FADE * 4 && (
+        {landscape ? (
+          <>
+            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
+            {base.map((seg, i) =>
+              seg.type === "text" || seg.type === "end_card" ? (
+                <Sequence key={`c${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
+                  <LandscapeCard text={seg.text ?? brand?.name ?? ""} width={baseWidth} height={baseHeight} safe={safeArea} />
+                </Sequence>
+              ) : null,
+            )}
+          </>
+        ) : (
+          // Each shot stays up under the next one while it fades in, so a cut never shows the black backdrop.
+          base.map((seg, i) => (
+            <Sequence
+              key={`b${i}`}
+              from={Math.round(seg.start * fps)}
+              durationInFrames={Math.max(1, Math.round(seg.duration * fps)) + (i < base.length - 1 ? ENTER_FRAMES : 0)}
+            >
+              <SegmentView segment={seg} index={i} {...view} />
+            </Sequence>
+          ))
+        )}
+        {!landscape && loop && base.length > 1 && durationInFrames > LOOP_FADE * 4 && (
           <Sequence from={durationInFrames - LOOP_FADE} durationInFrames={LOOP_FADE}>
             <LoopFade>
               <SegmentView segment={base[0]!} index={0} {...view} />
@@ -77,6 +95,23 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   );
 }
 
+
+/** The landscape stage's shots: every screen or screenshot segment that has media, in order. */
+function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls: Record<string, string>, fps: number): SceneShot[] {
+  const shots: SceneShot[] = [];
+  for (const seg of base) {
+    const src = seg.clip_id ? clipUrls[seg.clip_id] : undefined;
+    const image = seg.image_id ? imageUrls[seg.image_id] : undefined;
+    const media: Media | null =
+      seg.type === "screen" && src
+        ? { kind: "video", src, trimBefore: Math.round((seg.clip_offset ?? 0) * fps) }
+        : seg.type === "screenshot" && image
+          ? { kind: "image", src: image }
+          : null;
+    if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)) });
+  }
+  return shots;
+}
 
 /** Fade the first shot in over the last frames so a looping video joins up. */
 function LoopFade({ children }: { children: React.ReactNode }) {
@@ -113,16 +148,6 @@ function SegmentView({
   const enter = useEntrance(index);
   const src = segment.clip_id ? clipUrls[segment.clip_id] : undefined;
   const image = segment.image_id ? imageUrls[segment.image_id] : undefined;
-
-  if (landscape) {
-    const stage = { index, width: baseWidth, height: baseHeight, safe: safeArea };
-    if (segment.type === "screen" && src) return <Stage media={{ kind: "video", src, trimBefore: Math.round((segment.clip_offset ?? 0) * fps) }} {...stage} />;
-    if (segment.type === "screenshot" && image) return <Stage media={{ kind: "image", src: image }} {...stage} />;
-    if (segment.type === "text" || segment.type === "end_card") {
-      return <LandscapeCard text={segment.text ?? brand?.name ?? ""} width={baseWidth} height={baseHeight} safe={safeArea} />;
-    }
-    return <AbsoluteFill style={{ backgroundColor: "#18181F" }} />;
-  }
 
   if (segment.type === "screen" && src) {
     const zoom = 1 + PUSH_IN * interpolate(frame, [0, durationInFrames], [0, 1], { extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
@@ -212,33 +237,32 @@ function HookOverlay({ text, width }: { text: string; width: number }) {
   );
 }
 
-/** What's on screen: a short line in a dark pill in the lower third. */
+/**
+ * A caption in the lower third: plain bold words rising in over a soft shadow, no box. A boxed caption
+ * sliding up looked like an iOS notification banner landing on the screen.
+ */
 function CaptionOverlay({ text, width }: { text: string; width: number }) {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const rise = spring({ frame, fps, config: { damping: 16, stiffness: 150 } });
   const exit = useExit();
-  const pad = Math.round(width * 0.06);
+  const pad = Math.round(width * 0.07);
   return (
-    <AbsoluteFill style={{ padding: pad, paddingBottom: pad * 3, justifyContent: "flex-end", alignItems: "center", opacity: exit }}>
-      <div
-        style={{
-          background: "rgba(10,10,14,.86)",
-          border: `${Math.max(2, Math.round(width * 0.004))}px solid rgba(255,255,255,.12)`,
-          padding: `${pad * 0.35}px ${pad * 0.55}px`,
-          borderRadius: pad * 0.5,
-          maxWidth: "100%",
-          opacity: rise,
-          transform: `translateY(${(1 - rise) * 60}px)`,
-          boxShadow: "0 24px 50px rgba(0,0,0,.5)",
-        }}
-      >
-        <Words text={text} style={{ ...DISPLAY, color: "#F5F4F8", fontSize: fitSize(text, width, 0.085), justifyContent: "center", textAlign: "center" }} />
+    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", opacity: exit }}>
+      <AbsoluteFill style={{ background: "linear-gradient(180deg, transparent 58%, rgba(6,6,10,.55) 82%, rgba(6,6,10,.7))" }} />
+      <div style={{ padding: pad, paddingBottom: pad * 2.6, maxWidth: "100%" }}>
+        <RevealWords
+          text={text}
+          style={{
+            ...DISPLAY,
+            color: "#FFFFFF",
+            fontSize: fitSize(text, width, 0.09),
+            justifyContent: "center",
+            textAlign: "center",
+            textShadow: "0 4px 24px rgba(0,0,0,.55), 0 1px 3px rgba(0,0,0,.5)",
+          }}
+        />
       </div>
     </AbsoluteFill>
   );
 }
-
 
 /** App icon and name over the last seconds of the video. */
 function BrandOverlay({ brand, text, width }: { brand?: Brand; text?: string; width: number }) {

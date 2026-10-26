@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, metadata, task } from "@trigger.dev/sdk";
+import { iconAccent } from "@/lib/media/accent";
 import { appScreenshots } from "@/lib/media/screenshots";
 import { loadPackWithApp, readyClips } from "@/lib/packs";
 import { Listing } from "@/lib/schemas/listing";
@@ -24,7 +25,8 @@ export const compose = task({
     if (final) throw new Error("Final renders arrive with payment (M6).");
     const db = supabaseAdmin();
     const { app } = await loadPackWithApp(packId);
-    const brand = { name: app.name, iconUrl: app.icon_url };
+    // The landscape stage lights itself in the app's own colour, read from its icon.
+    const brand = { name: app.name, iconUrl: app.icon_url, accent: await iconAccent(app.icon_url) };
     const clips = await readyClips(packId);
     const urls = await signedUrls(clips.map((c) => c.path), 6 * 3600);
     const clipUrls = Object.fromEntries(clips.map((c) => [c.id, urls[c.path]!]));

@@ -25,7 +25,7 @@ export default defineConfig({
         ],
       }),
       additionalFiles({
-        files: ["./src/remotion/**", "./src/lib/specs/**", "./src/lib/timeline/**"],
+        files: ["./src/remotion/**", "./public/fonts/**", "./src/lib/specs/**", "./src/lib/timeline/**"],
       }),
       // No task imports react-dom, so marking it external alone doesn't install it,
       // but the Remotion bundle needs it at render time.
