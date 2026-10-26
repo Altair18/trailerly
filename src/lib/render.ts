@@ -31,6 +31,7 @@ export async function renderOutput(opts: {
   outFile: string;
   onProgress?: (progress: number) => void;
 }): Promise<void> {
+  // Only a video with a soundtrack keeps its audio; the rest render muted (header and search must be silent).
   const { renderMedia, selectComposition } = await import("@remotion/renderer");
   const serveUrl = await bundleOnce();
   const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || null;
@@ -40,7 +41,7 @@ export async function renderOutput(opts: {
     composition,
     inputProps: opts.props,
     codec: "h264",
-    muted: true,
+    muted: !opts.props.soundtrack?.bed,
     outputLocation: opts.outFile,
     browserExecutable,
     onProgress: ({ progress }) => opts.onProgress?.(progress),

@@ -2,9 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger, metadata, task } from "@trigger.dev/sdk";
-import { iconAccent } from "@/lib/media/accent";
+import { iconAccent, iconStyle } from "@/lib/media/accent";
 import { lintLandscapeTimeline } from "@/lib/media/render-lint";
 import { appScreenshots } from "@/lib/media/screenshots";
+import { type MusicManifest, soundtrackFor } from "@/lib/media/music";
+import { readFile } from "node:fs/promises";
 import { loadPackWithApp, readyClips } from "@/lib/packs";
 import { Listing } from "@/lib/schemas/listing";
 import { renderOutput, renderStillImage } from "@/lib/render";
@@ -41,11 +43,20 @@ export const compose = task({
     const db = supabaseAdmin();
     const { app } = await loadPackWithApp(packId);
     // The landscape stage lights itself in the app's own colour, read from its icon.
-    const brand = { name: app.name, iconUrl: app.icon_url, accent: await iconAccent(app.icon_url) };
     const clips = await readyClips(packId);
     const urls = await signedUrls(clips.map((c) => c.path), 6 * 3600);
     const clipUrls = Object.fromEntries(clips.map((c) => [c.id, urls[c.path]!]));
     const listing = Listing.safeParse(app.listing_json);
+    // The app's colours and type dress every frame (agency videos never share one template between apps).
+    const brand = {
+      name: app.name,
+      iconUrl: app.icon_url,
+      accent: await iconAccent(app.icon_url),
+      style: await iconStyle(app.icon_url, listing.success ? listing.data.genre : null),
+    };
+    // The preview's music comes from the library in public/music (scripts/music/import.mjs); silent until it has beds.
+    const manifest = await readFile(join(process.cwd(), "public/music/manifest.json"), "utf8").then((t) => JSON.parse(t) as MusicManifest).catch(() => null);
+    const soundtrack = soundtrackFor(manifest, listing.success ? listing.data.genre : null, packId);
     const imageUrls = Object.fromEntries(appScreenshots(listing.success ? listing.data : null).map((s) => [s.id, s.url]));
 
     const rendered: OutputSpecId[] = [];
@@ -71,6 +82,7 @@ export const compose = task({
             safeArea: spec.safeArea,
             brand,
             scale: DRAFT_SCALE,
+            soundtrack: id === "preview" ? soundtrack : undefined,
           };
           await renderOutput({
             spec: id,

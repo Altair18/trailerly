@@ -1,0 +1,82 @@
+{
+  "beds": [
+    {
+      "id": "bright-pop",
+      "file": "music/bright-pop.mp3",
+      "moods": [
+        "upbeat",
+        "playful"
+      ]
+    },
+    {
+      "id": "calm-lofi",
+      "file": "music/calm-lofi.mp3",
+      "moods": [
+        "calm",
+        "warm"
+      ]
+    },
+    {
+      "id": "tech-pulse",
+      "file": "music/tech-pulse.mp3",
+      "moods": [
+        "focused",
+        "tech"
+      ]
+    },
+    {
+      "id": "acoustic-sun",
+      "file": "music/acoustic-sun.mp3",
+      "moods": [
+        "warm",
+        "natural"
+      ]
+    },
+    {
+      "id": "cinematic-rise",
+      "file": "music/cinematic-rise.mp3",
+      "moods": [
+        "premium",
+        "calm"
+      ]
+    },
+    {
+      "id": "energy-drive",
+      "file": "music/energy-drive.mp3",
+      "moods": [
+        "energetic",
+        "sport"
+      ]
+    },
+    {
+      "id": "game-bounce",
+      "file": "music/game-bounce.mp3",
+      "moods": [
+        "playful",
+        "game"
+      ]
+    },
+    {
+      "id": "soft-corporate",
+      "file": "music/soft-corporate.mp3",
+      "moods": [
+        "trust",
+        "calm"
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "id": "whoosh",
+      "file": "music/whoosh.mp3"
+    },
+    {
+      "id": "pop",
+      "file": "music/pop.mp3"
+    },
+    {
+      "id": "tap",
+      "file": "music/tap.mp3"
+    }
+  ]
+}

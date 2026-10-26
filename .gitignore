@@ -10,3 +10,6 @@ next-env.d.ts
 renders/
 .DS_Store
 scripts/out/
+
+# Raw music downloads (scripts/music/import.mjs builds public/music from them)
+/music/

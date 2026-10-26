@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { it } from "vitest";
 import { renderOutput } from "@/lib/render";
-import { iconAccent } from "@/lib/media/accent";
+import { iconAccent, iconStyle } from "@/lib/media/accent";
+import { soundtrackFor } from "@/lib/media/music";
 import type { Look } from "@/remotion/compositions/Landscape";
 import { OUTPUT_SPECS } from "@/lib/specs/outputs";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
@@ -66,8 +67,9 @@ it("renders the preview looks", async () => {
           loop: spec.loop,
           baseWidth: spec.width,
           baseHeight: spec.height,
-          brand: { name: "Sprout", iconUrl: url("icon.png"), accent },
+          brand: { name: "Sprout", iconUrl: url("icon.png"), accent, style: await iconStyle(join(D, "icon.png"), process.env.GENRE) },
           scale: SCALE,
+          soundtrack: process.env.SOUND ? soundtrackFor(JSON.parse(readFileSync("public/music/manifest.json", "utf8")), process.env.GENRE, "demo") : undefined,
           look,
         },
       });
