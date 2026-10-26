@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LinkIcon } from "@/components/Icons";
+import { PENDING_LINK_KEY } from "@/components/landing/LinkBar";
 import { TopBar } from "@/components/TopBar";
 
 // Journey step 1: paste the App Store link. The recording upload (step 2) arrives in M2.
@@ -11,6 +12,15 @@ export default function NewPack() {
   const [link, setLink] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A link pasted on the home page.
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem(PENDING_LINK_KEY);
+      if (pending) setLink(pending);
+      sessionStorage.removeItem(PENDING_LINK_KEY);
+    } catch {}
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
