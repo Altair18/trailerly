@@ -78,7 +78,7 @@ export const LOOKS: Look[] = ["studio", "cinematic", "bold"];
 export const DEFAULT_LOOK: Look = "cinematic";
 
 /** Relative luminance of "#RRGGBB" (0 black to 1 white). */
-function luminance(hex: string): number {
+export function luminance(hex: string): number {
   const n = parseInt(hex.replace("#", "").slice(0, 6).padEnd(6, "0"), 16);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(((n >> 16) & 255) / 255) + 0.7152 * lin(((n >> 8) & 255) / 255) + 0.0722 * lin((n & 255) / 255);
@@ -106,7 +106,7 @@ interface LookStyle {
   vignette: string;
 }
 
-const WARM = "#FFB37A";
+export const WARM = "#FFB37A";
 
 export function lookStyle(look: Look, accent: string): LookStyle {
   if (look === "cinematic") {
@@ -180,7 +180,7 @@ export function lookStyle(look: Look, accent: string): LookStyle {
 const GRAIN =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")";
 
-function Grain({ opacity }: { opacity: number }) {
+export function Grain({ opacity }: { opacity: number }) {
   const frame = useCurrentFrame();
   return (
     <AbsoluteFill
