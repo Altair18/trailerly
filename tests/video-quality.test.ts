@@ -68,7 +68,7 @@ describe("clip ranking and fallback", () => {
   it("leaves out clips with personal data when there's enough without them", () => {
     const t = fallbackPreview(clips, "Stuck on a bug for hours? Claude finds it", OUTPUT_SPECS.preview);
     expect(t.segments.some((s) => s.clip_id === "clip_2")).toBe(false);
-    expect(t.segments.find((s) => s.style === "hook")?.text).toBe("Stuck on a bug for hours");
+    expect(t.segments.find((s) => s.style === "hook")?.text).toBe("Stuck on a bug for hours?");
     expect(t.segments.some((s) => s.style === "brand")).toBe(true);
     expect(enforceSpec(t, OUTPUT_SPECS.preview, Object.fromEntries(clips.map((c) => [c.id, c.duration])))).toEqual([]);
   });

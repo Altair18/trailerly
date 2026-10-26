@@ -64,9 +64,9 @@ const APPS: { name: string; ctx: Omit<PlanContext, "avoidTemplates"> }[] = [
 ];
 
 const SPECS: OutputSpecId[] = ["preview", "header", "search"];
-const SETUPS: { name: string; tierFor: (tier: Tier) => Tier }[] = [
-  { name: "fast first, main model retry", tierFor: (t) => t },
-  { name: "main model only", tierFor: () => "smart" },
+const SETUPS: { name: string; tiers: Tier[] }[] = [
+  { name: "fast first, main model retry", tiers: ["fast", "smart"] },
+  { name: "main model only", tiers: ["smart", "smart"] },
 ];
 
 it("compares planner setups", async () => {
@@ -88,7 +88,8 @@ it("compares planner setups", async () => {
       for (const id of SPECS) {
         const started = Date.now();
         const result = await planTimeline(OUTPUT_SPECS[id], { ...app.ctx, avoidTemplates: used }, (prompt, tier) =>
-          generateJson({ schema: TemplateFill, system: TEMPLATE_SYSTEM, prompt, tier: setup.tierFor(tier), maxTokens: 2048, step: `compare:${id}` }),
+          generateJson({ schema: TemplateFill, system: TEMPLATE_SYSTEM, prompt, tier, maxTokens: 2048, step: `compare:${id}` }),
+          setup.tiers,
         );
         if (result.timeline.template) used.push(result.timeline.template);
         rows.push({

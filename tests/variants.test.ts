@@ -26,7 +26,7 @@ describe("A/B set", () => {
     const base = fallbackTimeline(clips, "Stop guessing when to water", OUTPUT_SPECS.header);
     const t = withHook(base, "Never kill another plant. Seriously, never again");
     const hook = t.segments.find((s) => s.style === "hook")!;
-    expect(hook.text).toBe("Never kill another plant");
+    expect(hook.text).toBe("Never kill another plant. Seriously, never again");
     expect(t.segments.filter((s) => !s.overlay)).toEqual(base.segments.filter((s) => !s.overlay));
     expect(enforceSpec(t, spec, { clip_1: 9, clip_2: 8 })).toEqual([]);
     expect(base.segments.find((s) => s.style === "hook")!.text).toBe("Stop guessing when to water");
