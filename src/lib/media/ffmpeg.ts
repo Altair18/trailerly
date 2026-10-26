@@ -154,6 +154,19 @@ export function padRegions<R extends { x: number; y: number; w: number; h: numbe
   });
 }
 
+/** Share of the frame (0 to 1) covered by the union of these boxes, so overlapping boxes count once. */
+export function coveredShare(regions: { x: number; y: number; w: number; h: number }[], grid = 100): number {
+  let covered = 0;
+  for (let gy = 0; gy < grid; gy++) {
+    for (let gx = 0; gx < grid; gx++) {
+      const x = (gx + 0.5) / grid;
+      const y = (gy + 0.5) / grid;
+      if (regions.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)) covered++;
+    }
+  }
+  return covered / (grid * grid);
+}
+
 export interface Span {
   start: number;
   duration: number;

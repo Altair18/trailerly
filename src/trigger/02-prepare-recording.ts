@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { logger, task } from "@trigger.dev/sdk";
 import { MAX_RECORDING_SECONDS, MIN_RECORDING_SECONDS, planClips } from "@/lib/media/clips";
 import { analyseClips, ClipNotesReply, type ClipFrames } from "@/lib/media/analyse";
-import { blurRegions, chromeCrop, cutClip, frameAt, idleSpans, normalise, padRegions, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
+import { blurRegions, chromeCrop, coveredShare, cutClip, frameAt, idleSpans, normalise, padRegions, poster, probe, sceneChanges, toPixels } from "@/lib/media/ffmpeg";
 import { generateJson } from "@/lib/llm/claude";
 import { Brief } from "@/lib/schemas/brief";
 import { ShotList } from "@/lib/schemas/shotlist";
@@ -105,12 +105,13 @@ async function sampleFrames(clipFile: string, dir: string, n: number, duration: 
   return out;
 }
 
-/** Share of the frame that can be blurred before a clip isn't worth showing. */
-const MAX_BLUR_SHARE = 0.45;
+/** Share of the frame that can be blurred before a clip loses interest. */
+const DULL_BLUR_SHARE = 0.45;
 
 /**
  * Blur the regions Claude marked in each private clip, re-upload the clip and its poster,
- * and mark it blurred. Mostly-blurred clips also lose interest so the planner prefers others.
+ * and mark it blurred with how much of the frame the blur covers. Mostly-blurred clips lose interest so the
+ * planner prefers others, and clips blurred past MAX_BLUR_SHARE are left out when screenshots can fill in.
  */
 async function blurPrivateClips(clips: Clip[], dir: string, packId: string, version: string, size: { width: number; height: number }) {
   for (const [i, clip] of clips.entries()) {
@@ -128,11 +129,12 @@ async function blurPrivateClips(clips: Clip[], dir: string, packId: string, vers
     clip.poster_path = paths.poster(packId, version, n, "-blurred");
     await uploadFile(clip.path, out, "video/mp4");
     await uploadFile(clip.poster_path, posterFile, "image/jpeg");
-    const share = rects.reduce((a, r) => a + r.w * r.h, 0) / (size.width * size.height);
+    const share = Math.round(coveredShare(regions) * 100) / 100;
     clip.notes = {
       ...clip.notes,
       blurred: true,
-      interest: share > MAX_BLUR_SHARE ? Math.max(1, clip.notes.interest - 2) : clip.notes.interest,
+      blur_share: share,
+      interest: share > DULL_BLUR_SHARE ? Math.max(1, clip.notes.interest - 2) : clip.notes.interest,
     };
     logger.info("Blurred private areas", { packId, clip: clip.id, regions: rects.length, share: Math.round(share * 100) });
   }
