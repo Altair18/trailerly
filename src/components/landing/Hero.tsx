@@ -16,7 +16,7 @@ const SLIDES = [
     tagBg: "#FFE135",
   },
   {
-    tag: "New in iOS 27",
+    tag: "iOS 27 ready",
     title: "Header and search videos",
     sub: "Apple's new 21:9 header and 3:2 search videos, plus matching stills, with your text kept inside every device crop.",
     cta: "Start with my link",

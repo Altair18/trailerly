@@ -2,11 +2,14 @@ import Link from "next/link";
 import { ExampleGrid } from "@/components/landing/ExampleGrid";
 import { Hero } from "@/components/landing/Hero";
 import { LinkBar } from "@/components/landing/LinkBar";
-import { Play } from "@/components/landing/Play";
+import { Compare } from "@/components/landing/Compare";
+import { CHECKOUT_LIVE, PRICES } from "@/components/landing/pricing";
+import { RecordingToPack } from "@/components/landing/RecordingToPack";
 import { Logo } from "@/components/TopBar";
 import "./landing.css";
 
 // Landing page, built from the approved option B frame. Social ads and checkout are not live yet, so they say "coming soon".
+// Prices come from components/landing/pricing.ts.
 
 const STRIP = [
   ["App Store preview, 886×1920", "var(--pink)"],
@@ -38,7 +41,7 @@ const STEPS = [
   { t: "Record 20 to 60 seconds", d: "Follow a shot list made for your app. We cut it into clips and flag dead time.", c: "var(--yel)" },
   { t: "Pick your hooks", d: "Choose a headline from 10 hooks written from your reviews. Edit any of them.", c: "var(--cyan)" },
   { t: "Preview free drafts", d: "Watch every video with its rules results before you spend anything.", c: "var(--lime)" },
-  { t: "Download the pack", d: "Full-size files, named for where each one goes in App Store Connect.", c: "var(--purple)" },
+  { t: CHECKOUT_LIVE ? "Download the pack" : "Download the pack (soon)", d: "Full-size files, named for where each one goes in App Store Connect.", c: "var(--purple)" },
 ];
 
 const FAQ = [
@@ -60,7 +63,7 @@ const FAQ = [
   },
   {
     q: "How much does it cost?",
-    a: "Drafts are free to preview. A full pack is a one-off payment, with no subscription. Checkout is being set up now, so paid downloads open soon.",
+    a: `Drafts are free to make and preview. ${PRICES.launch ? `The App Store pack will be ${PRICES.launch}, paid once` : "A pack will be a one-off payment"}, with no subscription.${CHECKOUT_LIVE ? "" : " Checkout is being set up now, so paid downloads open soon."}`,
   },
   {
     q: "What happens to my reviews and recording?",
@@ -71,6 +74,10 @@ const FAQ = [
 export default function Home() {
   return (
     <>
+      <p className="lp-ios flow">
+        <span className="lp-tag">iOS 27 ready</span>
+        Header and search videos are live in App Store Connect. <a href="#pack">See what&apos;s in a pack</a>
+      </p>
       <header className="topbar">
         <div className="wrap">
           <Logo />
@@ -78,7 +85,7 @@ export default function Home() {
             <a className="lp-nl" href="#explore">Examples</a>
             <a className="lp-nl" href="#pack">What&apos;s in a pack</a>
             <a className="lp-nl" href="#rules">Rules check <span className="lp-new">New</span></a>
-            <a className="lp-nl" href="#how">How it works</a>
+            <a className="lp-nl" href="#compare">Compare</a>
             <a className="lp-nl" href="#pricing">Pricing</a>
           </nav>
           <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
@@ -103,57 +110,7 @@ export default function Home() {
           </ul>
         </section>
 
-        <section id="pack" className="wrap lp-sec">
-          <div className="lp-head">
-            <div>
-              <h2 className="disp lp-h2">Every slot. One recording.</h2>
-              <p className="mu">Each video is cut from your recording and sized for where it runs.</p>
-            </div>
-            <Link className="btn btn-ghost" href="/packs/new">Start a pack</Link>
-          </div>
-          <div className="lp-mosaic">
-            <div className="lp-tile tall" style={{ gridColumn: "span 3", gridRow: "span 4" }}>
-              <div className="kb flow" style={{ backgroundImage: "linear-gradient(160deg,#FF2E88,#9D7BFF,#FF7A1A)" }} />
-              <Play />
-              <div className="lp-shade" />
-              <div className="lp-cap"><b>App Store preview</b><div className="mono">886×1920 · screen capture only</div></div>
-            </div>
-            <div className="lp-tile lp-bars wide" style={{ gridColumn: "span 9", gridRow: "span 2" }}>
-              <div className="kb flow" style={{ backgroundImage: "linear-gradient(110deg,#38D9FF,#2EE6A6,#B8F23A)" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 2, textAlign: "center", padding: "0 24px" }}>
-                <span className="disp" style={{ fontSize: "clamp(32px, 4.5vw, 54px)", color: "var(--ink)" }}>Stop guessing when to water</span>
-              </div>
-              <Play />
-              <div className="lp-cap" style={{ textAlign: "right" }}><span className="lp-badge">Header · 21:9 loop · iOS 27</span></div>
-            </div>
-            <div className="lp-tile" style={{ gridColumn: "span 3", gridRow: "span 2" }}>
-              <div className="kb flow" style={{ backgroundImage: "linear-gradient(140deg,#FFE135,#FF7A1A)" }} />
-              <Play />
-              <div className="lp-shade" />
-              <div className="lp-cap"><b>Search video</b><div className="mono">3:2 · works muted</div></div>
-            </div>
-            <div className="lp-tile" style={{ gridColumn: "span 3", gridRow: "span 2" }}>
-              <div className="kb flow" style={{ backgroundImage: "linear-gradient(140deg,#9D7BFF,#38D9FF)" }} />
-              <div className="lp-shade" />
-              <div className="lp-cap"><b>Stills</b><div className="mono">header · search · universal</div></div>
-            </div>
-            <div className="lp-tile" style={{ gridColumn: "span 3", gridRow: "span 2" }}>
-              <div className="kb flow" style={{ backgroundImage: "linear-gradient(180deg,#FF5A4E,#FFE135)" }} />
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, zIndex: 2 }} aria-hidden="true">
-                {["A", "B", "C"].map((l) => (
-                  <span key={l} className="disp" style={{ width: 52, height: 52, borderRadius: 14, background: "var(--ink)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>{l}</span>
-                ))}
-              </div>
-              <div className="lp-shade" />
-              <div className="lp-cap"><b>A/B variants</b><div className="mono">for Product Page tests</div></div>
-            </div>
-          </div>
-          <div className="lp-tile" style={{ marginTop: 14, padding: "20px 22px", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", border: "1px dashed #3a3a46" }}>
-            <span className="lp-soon">Coming soon</span>
-            <b>5 social ads for TikTok, Reels and Shorts</b>
-            <span className="mu">Vertical, with voice and captions, from the same recording.</span>
-          </div>
-        </section>
+        <RecordingToPack />
 
         <section id="rules" className="wrap lp-sec">
           <div className="lp-tile lp-rules">
@@ -180,6 +137,8 @@ export default function Home() {
           </div>
         </section>
 
+        <Compare />
+
         <ExampleGrid />
 
         <section id="how" className="wrap lp-sec">
@@ -203,19 +162,32 @@ export default function Home() {
         <section id="pricing" className="wrap lp-sec">
           <div className="lp-tile lp-price">
             <div className="kb flow" style={{ backgroundImage: "linear-gradient(120deg,#FF2E88,#FF7A1A,#FFE135,#9D7BFF)" }} />
-            <div style={{ position: "relative", zIndex: 2, padding: "56px 24px", color: "var(--ink)" }}>
-              <p className="mono" style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase" }}>One pack, paid once</p>
-              <h2 className="disp" style={{ margin: "0 0 10px", fontSize: "clamp(64px, 10vw, 96px)" }}>£19 per pack</h2>
-              <p style={{ margin: "0 0 18px", fontSize: 18, fontWeight: 600 }}>No subscription. Full size, no watermark. Drafts are free to preview.</p>
-              <ul>
-                <li>App Store preview</li>
-                <li>Header + search videos</li>
-                <li>3 stills</li>
-                <li>A/B variants</li>
-                <li>Rules report</li>
-              </ul>
-              <Link className="btn" href="/packs/new" style={{ background: "var(--ink)", color: "#fff", minHeight: 54, padding: "0 30px", fontSize: 16 }}>Start a pack</Link>
-              <p style={{ margin: "16px 0 0", fontSize: 14, fontWeight: 600 }}>Checkout opens soon. You can make and preview drafts today.</p>
+            <div style={{ position: "relative", zIndex: 2, padding: "48px 20px", color: "var(--ink)", width: "100%" }}>
+              <p className="mono" style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase" }}>Pay once per pack</p>
+              <h2 className="disp" style={{ margin: "0 0 24px", fontSize: "clamp(48px, 8vw, 80px)" }}>No subscription</h2>
+              <div className="lp-tiers">
+                <div className="lp-tier">
+                  <b>Launch pack</b>
+                  <span className={`disp amt${PRICES.launch ? "" : " tbc"}`}>{PRICES.launch ?? "Price coming soon"}</span>
+                  <ul>
+                    <li>App Store preview</li>
+                    <li>Header and search videos</li>
+                    <li>Header, search and universal stills</li>
+                    <li>Rules report</li>
+                  </ul>
+                </div>
+                <div className="lp-tier">
+                  <b>Full pack</b>
+                  <span className={`disp amt${PRICES.full ? "" : " tbc"}`}>{PRICES.full ?? "Price coming soon"}</span>
+                  <ul>
+                    <li>Everything in the launch pack</li>
+                    <li>A/B variants for Product Page tests</li>
+                    <li>5 social ads, when they launch</li>
+                  </ul>
+                </div>
+              </div>
+              <Link className="btn" href="/packs/new" style={{ background: "var(--ink)", color: "#fff", minHeight: 54, padding: "0 30px", fontSize: 16 }}>Make free drafts</Link>
+              {!CHECKOUT_LIVE && <p style={{ margin: "16px 0 0", fontSize: 14, fontWeight: 600 }}>Checkout opens soon. You can make and preview drafts today.</p>}
             </div>
           </div>
         </section>
@@ -243,6 +215,7 @@ export default function Home() {
             <b style={{ fontSize: 14 }}>Product</b>
             <a href="#pack">What&apos;s in a pack</a>
             <a href="#rules">Rules check</a>
+            <a href="#compare">Compare</a>
             <a href="#explore">Examples</a>
             <a href="#pricing">Pricing</a>
           </nav>

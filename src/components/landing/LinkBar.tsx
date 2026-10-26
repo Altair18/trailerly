@@ -23,7 +23,7 @@ export function LinkBar() {
       <div className="lp-linkbar">
         <div style={{ flex: "1 1 300px" }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 22 }}>Paste a link, get a pack</h2>
-          <p className="mu" style={{ margin: 0 }}>Drafts are free to preview. You only pay to download full size.</p>
+          <p className="mu" style={{ margin: 0 }}>Drafts are free to make and preview. Full-size downloads open soon.</p>
         </div>
         <form onSubmit={submit}>
           <label htmlFor="lp-link" className="sr">App Store link</label>
