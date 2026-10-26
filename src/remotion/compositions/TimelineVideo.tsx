@@ -3,7 +3,7 @@ import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
-import { LandscapeCard, LandscapeOverlay, type SafeArea, Stage } from "./Landscape";
+import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Media, type SafeArea, type SceneShot } from "./Landscape";
 import { AppIcon, type Brand, DISPLAY, INK, PUSH_IN, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
 
 export type { Brand } from "./parts";
@@ -45,12 +45,25 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   return (
     <AbsoluteFill style={{ backgroundColor: INK }}>
       <div style={{ position: "absolute", left: 0, top: 0, width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: "top left", overflow: "hidden" }}>
-        {base.map((seg, i) => (
-          <Sequence key={`b${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
-            <SegmentView segment={seg} index={i} {...view} />
-          </Sequence>
-        ))}
-        {loop && base.length > 1 && durationInFrames > LOOP_FADE * 4 && (
+        {landscape ? (
+          <>
+            <LandscapeScene shots={sceneShots(base, clipUrls, imageUrls, fps)} width={baseWidth} height={baseHeight} safe={safeArea} loop={loop} accent={brand?.accent} />
+            {base.map((seg, i) =>
+              seg.type === "text" || seg.type === "end_card" ? (
+                <Sequence key={`c${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
+                  <LandscapeCard text={seg.text ?? brand?.name ?? ""} width={baseWidth} height={baseHeight} safe={safeArea} />
+                </Sequence>
+              ) : null,
+            )}
+          </>
+        ) : (
+          base.map((seg, i) => (
+            <Sequence key={`b${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
+              <SegmentView segment={seg} index={i} {...view} />
+            </Sequence>
+          ))
+        )}
+        {!landscape && loop && base.length > 1 && durationInFrames > LOOP_FADE * 4 && (
           <Sequence from={durationInFrames - LOOP_FADE} durationInFrames={LOOP_FADE}>
             <LoopFade>
               <SegmentView segment={base[0]!} index={0} {...view} />
@@ -77,6 +90,23 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   );
 }
 
+
+/** The landscape stage's shots: every screen or screenshot segment that has media, in order. */
+function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls: Record<string, string>, fps: number): SceneShot[] {
+  const shots: SceneShot[] = [];
+  for (const seg of base) {
+    const src = seg.clip_id ? clipUrls[seg.clip_id] : undefined;
+    const image = seg.image_id ? imageUrls[seg.image_id] : undefined;
+    const media: Media | null =
+      seg.type === "screen" && src
+        ? { kind: "video", src, trimBefore: Math.round((seg.clip_offset ?? 0) * fps) }
+        : seg.type === "screenshot" && image
+          ? { kind: "image", src: image }
+          : null;
+    if (media) shots.push({ media, from: Math.round(seg.start * fps), frames: Math.max(1, Math.round(seg.duration * fps)) });
+  }
+  return shots;
+}
 
 /** Fade the first shot in over the last frames so a looping video joins up. */
 function LoopFade({ children }: { children: React.ReactNode }) {
@@ -113,16 +143,6 @@ function SegmentView({
   const enter = useEntrance(index);
   const src = segment.clip_id ? clipUrls[segment.clip_id] : undefined;
   const image = segment.image_id ? imageUrls[segment.image_id] : undefined;
-
-  if (landscape) {
-    const stage = { index, width: baseWidth, height: baseHeight, safe: safeArea };
-    if (segment.type === "screen" && src) return <Stage media={{ kind: "video", src, trimBefore: Math.round((segment.clip_offset ?? 0) * fps) }} {...stage} />;
-    if (segment.type === "screenshot" && image) return <Stage media={{ kind: "image", src: image }} {...stage} />;
-    if (segment.type === "text" || segment.type === "end_card") {
-      return <LandscapeCard text={segment.text ?? brand?.name ?? ""} width={baseWidth} height={baseHeight} safe={safeArea} />;
-    }
-    return <AbsoluteFill style={{ backgroundColor: "#18181F" }} />;
-  }
 
   if (segment.type === "screen" && src) {
     const zoom = 1 + PUSH_IN * interpolate(frame, [0, durationInFrames], [0, 1], { extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });

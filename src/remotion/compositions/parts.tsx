@@ -6,6 +6,8 @@ import type { CSSProperties } from "react";
 export interface Brand {
   name: string;
   iconUrl: string | null;
+  /** The app's colour (from its icon), for glows and the hook's key word. */
+  accent?: string;
 }
 
 export const INK = "#0A0A0E";

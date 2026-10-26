@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<style>html{zoom:2}
+:root{--g:#1F8A5B;--g2:#E7F5EC;--ink:#14201A;--mut:#6B7A72;--bg:#F6F8F5;--card:#fff;--amber:#F4A62A;--blue:#3B82F6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:390px;height:844px;overflow:hidden;background:var(--bg);font-family:-apple-system,"SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+.status{height:47px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 8px;font-weight:600;font-size:16px}
+.screen{position:absolute;top:47px;left:0;width:390px;height:797px;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .35s;background:var(--bg)}
+.hidden{transform:translateX(100%)}
+.left{transform:translateX(-30%);opacity:.0}
+h1{font-size:32px;font-weight:800;letter-spacing:-.5px;padding:8px 20px 2px}
+.sub{color:var(--mut);padding:0 20px 14px;font-size:15px}
+.today{margin:0 16px 14px;background:linear-gradient(135deg,#1F8A5B,#2FB277);color:#fff;border-radius:22px;padding:18px 18px 16px;box-shadow:0 10px 24px rgba(31,138,91,.25)}
+.today b{font-size:22px;display:block;margin-bottom:4px}.today span{opacity:.9;font-size:14px}
+.bar{height:8px;background:rgba(255,255,255,.3);border-radius:9px;margin-top:12px;overflow:hidden}.bar i{display:block;height:100%;width:40%;background:#fff;border-radius:9px;transition:width .6s}
+.sec{font-size:13px;font-weight:700;color:var(--mut);letter-spacing:.6px;text-transform:uppercase;padding:6px 20px 8px}
+.list{padding:0 16px;transition:transform .8s cubic-bezier(.2,.8,.2,1)}
+.plant{display:flex;align-items:center;gap:14px;background:var(--card);border-radius:18px;padding:12px;margin-bottom:10px;box-shadow:0 2px 8px rgba(20,32,26,.06);transition:background .3s,transform .2s}
+.plant.tap{transform:scale(.97)}
+.av{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px}
+.pn{font-weight:700;font-size:17px}.pm{color:var(--mut);font-size:14px;margin-top:2px}
+.pill{margin-left:auto;font-size:13px;font-weight:700;padding:7px 12px;border-radius:99px;background:#FFF3DD;color:#A86400}
+.pill.ok{background:var(--g2);color:var(--g)}
+.chk{margin-left:auto;width:34px;height:34px;border-radius:50%;border:2.5px solid #CFD8D2;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;transition:all .3s}
+.chk.on{background:var(--g);border-color:var(--g)}
+.tab{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.95);border-top:1px solid #E3E8E4;display:flex;justify-content:space-around;padding-top:10px;font-size:11px;color:var(--mut);font-weight:600}
+.tab div{text-align:center}.tab .on{color:var(--g)}.tab em{font-style:normal;font-size:24px;display:block}
+.fab{position:absolute;right:20px;bottom:104px;width:62px;height:62px;border-radius:50%;background:var(--g);color:#fff;font-size:34px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(31,138,91,.35);transition:transform .2s}
+.fab.tap{transform:scale(.88)}
+.cam{margin:10px 16px;height:430px;border-radius:26px;background:radial-gradient(circle at 50% 45%,#5DAA68,#2E6B3A 60%,#1C3F24);position:relative;overflow:hidden}
+.leaf{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-size:180px;transition:transform 1.2s}
+.scanline{position:absolute;left:8%;right:8%;height:3px;background:#B6FFCF;box-shadow:0 0 18px #B6FFCF;top:10%;transition:top 1.6s ease-in-out}
+.frame{position:absolute;inset:14% 14%;border:3px solid rgba(255,255,255,.85);border-radius:28px}
+.result{margin:0 16px;background:#fff;border-radius:22px;padding:18px;box-shadow:0 8px 24px rgba(20,32,26,.1);transform:translateY(40px);opacity:0;transition:all .5s}
+.result.show{transform:none;opacity:1}
+.result b{font-size:22px}.tag{display:inline-block;margin:10px 6px 0 0;padding:6px 10px;border-radius:99px;background:var(--g2);color:var(--g);font-weight:700;font-size:13px}
+.btn{margin:14px 16px;background:var(--g);color:#fff;text-align:center;font-weight:700;font-size:17px;padding:16px;border-radius:16px;transition:transform .2s}
+.btn.tap{transform:scale(.96)}
+.chart{display:flex;align-items:flex-end;gap:10px;height:170px;margin:6px 20px 16px;padding:14px;background:#fff;border-radius:20px;box-shadow:0 2px 8px rgba(20,32,26,.06)}
+.chart i{flex:1;background:linear-gradient(#2FB277,#1F8A5B);border-radius:8px 8px 4px 4px;height:4%;transition:height .9s cubic-bezier(.2,.8,.2,1)}
+.toast{position:absolute;left:50%;top:60px;transform:translate(-50%,-140%);background:#14201A;color:#fff;padding:12px 18px;border-radius:99px;font-weight:600;font-size:15px;transition:transform .45s cubic-bezier(.2,.8,.2,1);white-space:nowrap}
+.toast.show{transform:translate(-50%,0)}
+.streak{display:flex;gap:8px;padding:0 20px 14px}.streak div{flex:1;height:44px;border-radius:12px;background:#E3E8E4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--mut)}
+.streak .on{background:var(--g);color:#fff}
+</style></head><body>
+<div class="status"><span>9:41</span><span>●●● 􀙇 ▮</span></div>
+<div id="home" class="screen">
+  <h1>Good morning</h1><div class="sub">3 plants need water today</div>
+  <div class="today"><b>Today's care</b><span id="done">2 of 5 done</span><div class="bar"><i id="prog"></i></div></div>
+  <div class="sec">Your plants</div>
+  <div class="list" id="list">
+    <div class="plant" id="p1"><div class="av" style="background:#E7F5EC">🌿</div><div><div class="pn">Monstera</div><div class="pm">Living room · every 7 days</div></div><div class="chk" id="c1">✓</div></div>
+    <div class="plant" id="p2"><div class="av" style="background:#FFF3DD">🌵</div><div><div class="pn">Golden barrel</div><div class="pm">Window sill · every 21 days</div></div><div class="chk" id="c2">✓</div></div>
+    <div class="plant" id="p3"><div class="av" style="background:#E8F0FE">🪴</div><div><div class="pn">Fiddle leaf fig</div><div class="pm">Bedroom · every 5 days</div></div><div class="chk" id="c3">✓</div></div>
+    <div class="plant"><div class="av" style="background:#FCE8F1">🌸</div><div><div class="pn">Orchid</div><div class="pm">Kitchen · every 10 days</div></div><div class="pill ok">In 3 days</div></div>
+    <div class="plant"><div class="av" style="background:#E7F5EC">🍃</div><div><div class="pn">Pothos</div><div class="pm">Office · every 8 days</div></div><div class="pill ok">In 5 days</div></div>
+    <div class="plant"><div class="av" style="background:#FFF3DD">🌻</div><div><div class="pn">Sunflower</div><div class="pm">Balcony · every 2 days</div></div><div class="pill">Tomorrow</div></div>
+  </div>
+  <div class="fab" id="fab">+</div>
+</div>
+<div id="scan" class="screen hidden">
+  <h1>Identify a plant</h1><div class="sub">Point your camera at a leaf</div>
+  <div class="cam"><div class="leaf" id="leaf">🌿</div><div class="frame"></div><div class="scanline" id="sl"></div></div>
+  <div class="result" id="res"><b>Monstera deliciosa</b><div class="pm">98% match · Swiss cheese plant</div>
+  <span class="tag">💧 Every 7 days</span><span class="tag">☀️ Bright, indirect</span><span class="tag">🌡 18–27°C</span></div>
+  <div class="btn" id="add">Add to my plants</div>
+</div>
+<div id="stats" class="screen hidden">
+  <h1>Your streak</h1><div class="sub">You've kept every plant happy for 12 days</div>
+  <div class="streak"><div class="on">M</div><div class="on">T</div><div class="on">W</div><div class="on">T</div><div class="on">F</div><div class="on">S</div><div id="sun">S</div></div>
+  <div class="sec">Waterings this month</div>
+  <div class="chart" id="chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="sec">Healthiest plant</div>
+  <div class="list"><div class="plant"><div class="av" style="background:#E7F5EC">🌿</div><div><div class="pn">Monstera</div><div class="pm">3 new leaves this month</div></div><div class="pill ok">Thriving</div></div></div>
+</div>
+<div class="tab"><div class="on" id="t1"><em>🏠</em>Today</div><div id="t2"><em>📷</em>Identify</div><div id="t3"><em>📈</em>Progress</div><div><em>⚙️</em>Settings</div></div>
+<div class="toast" id="toast">💧 Watered · next in 7 days</div>
+<script>
+const $=id=>document.getElementById(id);const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function tap(el){el.classList.add('tap');setTimeout(()=>el.classList.remove('tap'),180)}
+function go(from,to,back){$(from).classList.add(back?'hidden':'left');$(to).classList.remove('hidden','left')}
+async function toast(t){$('toast').textContent=t;$('toast').classList.add('show');await wait(1400);$('toast').classList.remove('show')}
+window.run=async()=>{
+  $('prog').style.width='40%';await wait(1200);
+  // Shot 1: tick off waterings
+  for(const [n,txt,pct] of [[1,'💧 Monstera watered · next in 7 days','60%'],[3,'💧 Fig watered · next in 5 days','80%']]){
+    tap($('p'+n));$('c'+n).classList.add('on');$('prog').style.width=pct;$('done').textContent=(pct==='60%'?'3':'4')+' of 5 done';toast(txt);await wait(1700);}
+  $('list').style.transform='translateY(-120px)';await wait(1300);$('list').style.transform='none';await wait(900);
+  // Shot 2: identify a plant
+  tap($('fab'));await wait(250);go('home','scan');$('t1').classList.remove('on');$('t2').classList.add('on');await wait(700);
+  $('sl').style.top='86%';$('leaf').style.transform='translate(-50%,-50%) scale(1.15) rotate(-6deg)';await wait(1700);$('sl').style.top='12%';await wait(1500);
+  $('res').classList.add('show');await wait(2200);tap($('add'));toast('🌿 Monstera added');await wait(1600);
+  // Shot 3: progress
+  go('scan','stats');$('t2').classList.remove('on');$('t3').classList.add('on');await wait(500);
+  [35,55,48,72,64,88,95].forEach((h,i)=>setTimeout(()=>$('chart').children[i].style.height=h+'%',i*120));await wait(1600);
+  $('sun').classList.add('on');toast('🔥 13-day streak!');await wait(2600);
+};
+</script></body></html>
