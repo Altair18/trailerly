@@ -23,10 +23,10 @@ describe("header holds one line", () => {
 describe("brand close waits for the last card", () => {
   const card = { type: "screenshot", start: 20, duration: 5 } as Segment;
   it("starts after a card dealt in at the same moment has landed", () => {
-    expect(afterLanding({ type: "overlay", style: "brand", start: 20, duration: 5 } as Segment, [card], 30)).toBe(600 + 20);
+    expect(afterLanding({ type: "text", overlay: true, style: "brand", start: 20, duration: 5 } as Segment, [card], 30)).toBe(600 + 20);
   });
   it("leaves it alone over a recording or a settled card", () => {
-    expect(afterLanding({ type: "overlay", style: "brand", start: 23, duration: 2 } as Segment, [card], 30)).toBe(690);
-    expect(afterLanding({ type: "overlay", style: "brand", start: 20, duration: 5 } as Segment, [{ ...card, type: "screen" } as Segment], 30)).toBe(600);
+    expect(afterLanding({ type: "text", overlay: true, style: "brand", start: 23, duration: 2 } as Segment, [card], 30)).toBe(690);
+    expect(afterLanding({ type: "text", overlay: true, style: "brand", start: 20, duration: 5 } as Segment, [{ ...card, type: "screen" } as Segment], 30)).toBe(600);
   });
 });
