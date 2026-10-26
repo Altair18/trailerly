@@ -5,7 +5,7 @@ import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
 import { DEFAULT_LOOK, LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
 import { type Brand, DISPLAY, ENTER_FRAMES, INK, PINK } from "./parts";
-import { PortraitBrand, PortraitCard, PortraitEnd, PortraitLine, PortraitShot, PortraitStage } from "./Portrait";
+import { PORTRAIT_SWAP, PortraitBrand, PortraitCard, PortraitEnd, PortraitLine, PortraitShot, PortraitStage } from "./Portrait";
 
 export type { Brand } from "./parts";
 
@@ -68,9 +68,9 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
               <Sequence
                 key={`b${i}`}
                 from={Math.round(seg.start * fps)}
-                durationInFrames={Math.max(1, Math.round(seg.duration * fps)) + (i < base.length - 1 ? ENTER_FRAMES : 0)}
+                durationInFrames={Math.max(1, Math.round(seg.duration * fps)) + (i < base.length - 1 ? swapFrames(base[i + 1]!) : 0)}
               >
-                <PortraitSegment segment={seg} index={i} {...view} look={look} accent={accent} />
+                <PortraitSegment segment={seg} index={i} {...view} look={look} accent={accent} centred={!underLine(seg, overlays)} />
               </Sequence>
             ))}
             {loop && base.length > 1 && durationInFrames > LOOP_FADE * 4 && (
@@ -100,6 +100,17 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   );
 }
 
+
+/** Frames the next shot overlaps this one: a store screenshot is dealt in over a longer swap than a cut. */
+function swapFrames(next: Segment): number {
+  return next.type === "screenshot" ? PORTRAIT_SWAP : ENTER_FRAMES;
+}
+
+/** Whether any line of type shows while this shot is up. */
+export function underLine(seg: Segment, overlays: Segment[]): boolean {
+  const end = seg.start + seg.duration;
+  return overlays.some((o) => o.start < end - 0.05 && o.start + o.duration > seg.start + 0.05);
+}
 
 /** Whether a caption sits mostly over a store screenshot. */
 export function overScreenshot(o: Segment, base: Segment[]): boolean {
@@ -144,6 +155,7 @@ function PortraitSegment({
   baseHeight,
   look,
   accent,
+  centred,
 }: {
   segment: Segment;
   clipUrls: Record<string, string>;
@@ -154,6 +166,7 @@ function PortraitSegment({
   baseHeight: number;
   look: Look;
   accent: string;
+  centred?: boolean;
 }) {
   const { fps } = useVideoConfig();
   const src = segment.clip_id ? clipUrls[segment.clip_id] : undefined;
@@ -162,7 +175,9 @@ function PortraitSegment({
   if (segment.type === "screen" && src) {
     return <PortraitShot media={{ kind: "video", src, trimBefore: Math.round((segment.clip_offset ?? 0) * fps) }} index={index} fade={ENTER_FRAMES} {...size} />;
   }
-  if (segment.type === "screenshot" && image) return <PortraitShot media={{ kind: "image", src: image }} index={index} fade={ENTER_FRAMES} {...size} />;
+  if (segment.type === "screenshot" && image) {
+    return <PortraitShot media={{ kind: "image", src: image }} index={index} fade={ENTER_FRAMES} frames={Math.round(segment.duration * fps)} centred={centred} {...size} />;
+  }
   if (segment.type === "end_card") return <PortraitEnd brand={brand} text={segment.text} look={look} width={baseWidth} />;
   if (segment.type === "text") return <PortraitCard text={segment.text ?? ""} accent={accent} {...size} />;
   return null;

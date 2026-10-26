@@ -15,17 +15,19 @@ const LOOKS = (process.env.LOOKS ?? "studio,cinematic,bold").split(",") as Look[
 const WATERMARK = process.env.WATERMARK === "1";
 
 const caption = (start: number, duration: number, text: string): Segment => ({ type: "text", start, duration, text, overlay: true, style: "caption" });
+// Like a screenshot-only pack: store screenshots (each with its own headline), a hook, and the brand over the last one.
 const shots: Timeline = {
   segments: [
-    { type: "screenshot", image_id: "shot_4", start: 0, duration: 2.5 },
-    { type: "screenshot", image_id: "shot_1", start: 2.5, duration: 3 },
-    { type: "screenshot", image_id: "shot_2", start: 5.5, duration: 3 },
-    { type: "screenshot", image_id: "shot_3", start: 8.5, duration: 3 },
-    { type: "end_card", start: 11.5, duration: 2.5, text: "Happy plants, every day" },
-    { type: "text", start: 0, duration: 2.5, text: "Never forget to water again", overlay: true, style: "hook" },
-    caption(2.5, 3, "Reminders that fit your week"),
-    caption(5.5, 3, "Snap a leaf to name it"),
-    caption(8.5, 3, "Build a care streak"),
+    { type: "screenshot", image_id: "shot_4", start: 0, duration: 3.5 },
+    { type: "screenshot", image_id: "shot_1", start: 3.5, duration: 3.5 },
+    { type: "screenshot", image_id: "shot_2", start: 7, duration: 3.5 },
+    { type: "screenshot", image_id: "shot_3", start: 10.5, duration: 3.5 },
+    { type: "screenshot", image_id: "shot_1", start: 14, duration: 3 },
+    { type: "text", start: 0, duration: 3.5, text: "Never forget to water again", overlay: true, style: "hook" },
+    caption(3.5, 3.5, "Reminders that fit your week"),
+    caption(7, 3.5, "Snap a leaf to name it"),
+    caption(10.5, 3.5, "Build a care streak"),
+    { type: "text", start: 14, duration: 3, overlay: true, style: "brand" },
   ],
 };
 const screen = (clip: string, start: number, duration: number, offset = 0): Segment => ({ type: "screen", clip_id: clip, clip_offset: offset, start, duration });

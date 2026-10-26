@@ -150,32 +150,79 @@ export type PortraitMedia = { kind: "video"; src: string; trimBefore: number } |
  * One shot of the app's screen in its box. The box is the same in every shot, so a cut reads as the screen
  * changing, not a new picture arriving: the shot only fades in over the one before.
  */
-export function PortraitShot({ media, look, width, height, index, fade }: { media: PortraitMedia; look: Look; width: number; height: number; index: number; fade: number }) {
+/** Frames two store screenshots overlap while one is dealt over the other. */
+export const PORTRAIT_SWAP = 14;
+
+/**
+ * One shot of the app's screen in its box.
+ *
+ * A recording keeps one fixed box, so a cut reads as the screen changing: the shot only fades in over the one
+ * before. A store screenshot is a card: it is dealt up from below over the last one, which settles back and dims
+ * under it, and a soft light glances off it as it lands. With no line of type over it, the card sits in the middle
+ * of the frame instead of leaving an empty band on top.
+ */
+export function PortraitShot({
+  media,
+  look,
+  width,
+  height,
+  index,
+  fade,
+  frames,
+  centred = false,
+}: {
+  media: PortraitMedia;
+  look: Look;
+  width: number;
+  height: number;
+  index: number;
+  fade: number;
+  /** The shot's own length, before the next one overlaps it. */
+  frames?: number;
+  centred?: boolean;
+}) {
   const frame = useCurrentFrame();
   const L = portraitLayout(look, width, height);
-  const opacity = index === 0 ? 1 : interpolate(frame, [0, fade], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
-  const m = L.media;
+  const card = media.kind === "image" && !L.bleed;
+  const m = card && centred ? { ...L.media, y: (height - L.media.h) / 2 } : L.media;
   const fill: CSSProperties = { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%", display: "block" };
   // Edge to edge, a store screenshot (with its own headline at the bottom) would lose its foot: show it whole.
   const still: CSSProperties = L.bleed ? { ...fill, objectFit: "contain", objectPosition: "50% 0%" } : fill;
+
+  let opacity = index === 0 ? 1 : interpolate(frame, [0, fade], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
+  let transform = "none";
+  let dim = 0;
+  let sheen = -1;
+  if (card) {
+    opacity = 1;
+    const rise = index === 0 ? 1 : interpolate(frame, [0, PORTRAIT_SWAP], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+    const leave = frames ? interpolate(frame, [frames, frames + PORTRAIT_SWAP], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) }) : 0;
+    const y = (1 - rise) * (height - m.y + height * 0.04) - leave * height * 0.025;
+    transform = `translateY(${y}px) scale(${1 - 0.07 * leave}) rotate(${(1 - rise) * 2.5}deg)`;
+    dim = 0.55 * leave;
+    // The card underneath is gone by the time the new one lands, so its edge never peeks out below.
+    opacity = 1 - interpolate(leave, [0.1, 0.6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+    sheen = index === 0 ? -1 : interpolate(frame, [PORTRAIT_SWAP - 4, PORTRAIT_SWAP + 22], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
+  }
+  const box: CSSProperties = { position: "absolute", left: m.x, top: m.y, width: m.w, height: m.h, borderRadius: L.radius };
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ transform, transformOrigin: `50% ${m.y + m.h / 2}px`, opacity: card ? opacity : 1 }}>
       {!L.bleed && (
         // The screen's shadow and edge stay up through every cut.
-        <div
-          style={{
-            position: "absolute",
-            left: m.x,
-            top: m.y,
-            width: m.w,
-            height: m.h,
-            borderRadius: L.radius,
-            boxShadow: `0 ${width * 0.04}px ${width * 0.1}px rgba(0,0,0,.5), 0 0 0 ${Math.max(2, Math.round(width * 0.004))}px rgba(255,255,255,.1)`,
-          }}
-        />
+        <div style={{ ...box, boxShadow: `0 ${width * 0.04}px ${width * 0.1}px rgba(0,0,0,.5), 0 0 0 ${Math.max(2, Math.round(width * 0.004))}px rgba(255,255,255,.1)` }} />
       )}
-      <div style={{ position: "absolute", left: m.x, top: m.y, width: m.w, height: m.h, borderRadius: L.radius, overflow: "hidden", opacity, background: L.bleed && media.kind === "image" ? "transparent" : "#000" }}>
+      <div style={{ ...box, overflow: "hidden", opacity: card ? 1 : opacity, background: L.bleed && media.kind === "image" ? "transparent" : "#000" }}>
         {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={still} />}
+        {sheen > 0 && sheen < 1 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: `linear-gradient(115deg, transparent ${sheen * 160 - 40}%, rgba(255,255,255,.22) ${sheen * 160 - 25}%, transparent ${sheen * 160 - 10}%)`,
+            }}
+          />
+        )}
+        {dim > 0 && <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${dim})` }} />}
       </div>
     </AbsoluteFill>
   );
