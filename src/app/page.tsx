@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ExampleGrid } from "@/components/landing/ExampleGrid";
 import { Hero } from "@/components/landing/Hero";
 import { LinkBar } from "@/components/landing/LinkBar";
-import { Comet } from "@/components/landing/Comet";
 import { Gecko } from "@/components/landing/Gecko";
 import { Compare } from "@/components/landing/Compare";
 import { CHECKOUT_LIVE, PRICES } from "@/components/landing/pricing";
@@ -98,7 +97,6 @@ export default function Home() {
       </header>
 
       <main className="lp-main">
-        <Comet />
         <Gecko />
         <Hero />
         <LinkBar />
