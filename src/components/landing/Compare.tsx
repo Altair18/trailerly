@@ -21,7 +21,7 @@ export function Compare() {
       </div>
       <div className="lp-cmp" role="table" aria-label="Comparison of agency, done-for-you service and Trailerly">
         <div className="lp-cmp-row lp-cmp-head" role="row">
-          <span role="columnheader" className="lp-cmp-k" />
+          <span role="columnheader" className="lp-cmp-k"><span className="sr-only">What you compare</span></span>
           <span role="columnheader"><i style={{ background: "var(--purple)" }} />Agency</span>
           <span role="columnheader"><i style={{ background: "var(--yel)" }} />Done-for-you service</span>
           <span role="columnheader" className="us"><i style={{ background: "var(--pink)" }} />Trailerly</span>

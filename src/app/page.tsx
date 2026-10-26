@@ -76,10 +76,12 @@ const FAQ = [
 export default function Home() {
   return (
     <>
-      <p className="lp-ios flow">
-        <span className="lp-tag">iOS 27 ready</span>
-        Header and search videos are live in App Store Connect. <a href="#pack">See what&apos;s in a pack</a>
-      </p>
+      <aside aria-label="Announcement">
+        <p className="lp-ios flow" style={{ margin: 0 }}>
+          <span className="lp-tag">iOS 27 ready</span>
+          Header and search videos are live in App Store Connect. <a href="#pack">See what&apos;s in a pack</a>
+        </p>
+      </aside>
       <header className="topbar">
         <div className="wrap">
           <Logo />
