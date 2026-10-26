@@ -50,18 +50,59 @@ export function usePack(packId: string, busy: (p: PackState) => boolean) {
   const load = useCallback(async () => {
     const res = await fetch(`/api/packs/${packId}`);
     if (!res.ok) return setError(res.status === 404 ? "Pack not found." : "Couldn't load the pack.");
-    setPack((await res.json()) as PackState);
+    const next = (await res.json()) as PackState;
+    // Every load signs the media again, so each URL comes back with a new token. Keep the URL already on the
+    // page when the file is the same, or each poll would swap every video's src and restart it.
+    setPack((prev) => (prev ? keepSignedUrls(prev, next) : next));
   }, [packId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // Poll on a timer while busy rather than after each change: a poll that finds nothing new keeps the same pack
+  // object, so an effect keyed on the pack would never schedule the next one.
+  const isBusy = !!pack && busy(pack);
   useEffect(() => {
-    if (!pack || !busy(pack)) return;
-    const t = setTimeout(load, 2000);
-    return () => clearTimeout(t);
-  }, [pack, load, busy]);
+    if (!isBusy) return;
+    const t = setInterval(load, 2000);
+    return () => clearInterval(t);
+  }, [isBusy, load]);
 
   return { pack, error, reload: load };
+}
+
+/** The file a signed URL points at, without its token. */
+function fileOf(url: string): string | null {
+  if (!/^https?:\/\//.test(url)) return null;
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    return null;
+  }
+}
+
+/** `next`, with every URL that points at the same file as the one at the same place in `prev` kept from `prev`. */
+export function keepSignedUrls<T>(prev: T, next: T): T {
+  if (typeof next === "string" && typeof prev === "string") {
+    if (prev === next) return prev;
+    const a = fileOf(prev);
+    return (a && a === fileOf(next) ? prev : next) as T;
+  }
+  if (Array.isArray(next) && Array.isArray(prev)) {
+    const out = next.map((v, i) => (i < prev.length ? keepSignedUrls(prev[i], v) : v));
+    return (out.every((v, i) => v === prev[i]) && out.length === prev.length ? prev : out) as T;
+  }
+  if (next && prev && typeof next === "object" && typeof prev === "object") {
+    const p = prev as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    let same = Object.keys(p).length === Object.keys(next).length;
+    for (const [k, v] of Object.entries(next)) {
+      out[k] = k in p ? keepSignedUrls(p[k], v) : v;
+      if (out[k] !== p[k]) same = false;
+    }
+    return (same ? prev : out) as T;
+  }
+  return next;
 }
