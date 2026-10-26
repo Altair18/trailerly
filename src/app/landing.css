@@ -339,7 +339,10 @@
 @keyframes lp-pulse { to { transform: scale(1.06); opacity: 0.85; } }
 @media (max-width: 640px) {
   .lp-scene { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 45%, rgba(0, 0, 0, 0.4) 100%); mask-image: linear-gradient(180deg, #000 0%, #000 45%, rgba(0, 0, 0, 0.4) 100%); }
+  /* A narrow card shows only the left third of the scene, where the curtain's tie-back curve reads as a stray notch. */
+  .lp-scene g[clip-path] { clip-path: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-sway, .lp-vine, .lp-twinkle, .lp-drift, .lp-beam, .lp-bob, .lp-pulse { animation: none; }
 }
+.lp-hero p.lp-hero-price { margin: 14px 0 0; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.82); }
