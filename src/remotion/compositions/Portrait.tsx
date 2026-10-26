@@ -156,6 +156,8 @@ export function PortraitShot({ media, look, width, height, index, fade }: { medi
   const opacity = index === 0 ? 1 : interpolate(frame, [0, fade], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
   const m = L.media;
   const fill: CSSProperties = { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%", display: "block" };
+  // Edge to edge, a store screenshot (with its own headline at the bottom) would lose its foot: show it whole.
+  const still: CSSProperties = L.bleed ? { ...fill, objectFit: "contain", objectPosition: "50% 0%" } : fill;
   return (
     <AbsoluteFill>
       {!L.bleed && (
@@ -172,8 +174,8 @@ export function PortraitShot({ media, look, width, height, index, fade }: { medi
           }}
         />
       )}
-      <div style={{ position: "absolute", left: m.x, top: m.y, width: m.w, height: m.h, borderRadius: L.radius, overflow: "hidden", opacity, background: "#000" }}>
-        {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={fill} />}
+      <div style={{ position: "absolute", left: m.x, top: m.y, width: m.w, height: m.h, borderRadius: L.radius, overflow: "hidden", opacity, background: L.bleed && media.kind === "image" ? "transparent" : "#000" }}>
+        {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={still} />}
       </div>
     </AbsoluteFill>
   );

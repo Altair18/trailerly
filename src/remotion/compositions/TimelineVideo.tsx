@@ -44,7 +44,8 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   const scale = width / baseWidth;
   const accent = brand?.accent ?? PINK;
   const base = timeline.segments.filter((s) => !isOverlay(s)).sort((a, b) => a.start - b.start);
-  const overlays = timeline.segments.filter(isOverlay);
+  // Store screenshots carry their own headline, so in the portrait layout a caption over one would make two.
+  const overlays = timeline.segments.filter(isOverlay).filter((o) => landscape || o.style !== "caption" || !overScreenshot(o, base));
 
   return (
     <AbsoluteFill style={{ backgroundColor: INK }}>
@@ -99,6 +100,15 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
   );
 }
 
+
+/** Whether a caption sits mostly over a store screenshot. */
+export function overScreenshot(o: Segment, base: Segment[]): boolean {
+  const end = o.start + o.duration;
+  const covered = base
+    .filter((b) => b.type === "screenshot")
+    .reduce((sum, b) => sum + Math.max(0, Math.min(end, b.start + b.duration) - Math.max(o.start, b.start)), 0);
+  return covered > o.duration / 2;
+}
 
 /** The landscape stage's shots: every screen or screenshot segment that has media, in order. */
 function sceneShots(base: Segment[], clipUrls: Record<string, string>, imageUrls: Record<string, string>, fps: number): SceneShot[] {
@@ -161,7 +171,7 @@ function PortraitSegment({
 function Watermark({ width }: { width: number }) {
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-      <div style={{ ...DISPLAY, color: "rgba(255,255,255,0.13)", fontSize: Math.round(width * 0.12), transform: "rotate(-30deg)", whiteSpace: "nowrap" }}>
+      <div style={{ ...DISPLAY, color: "rgba(255,255,255,0.14)", WebkitTextStroke: `${Math.max(1, Math.round(width * 0.002))}px rgba(0,0,0,0.12)`, fontSize: Math.round(width * 0.12), transform: "rotate(-30deg)", whiteSpace: "nowrap" }}>
         TRAILERLY DRAFT
       </div>
     </AbsoluteFill>
