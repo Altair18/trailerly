@@ -79,6 +79,27 @@ describe("dead time", () => {
     expect(spans[0]!.duration).toBeGreaterThan(2.5);
   });
 
+  it("counts a dim, empty screen as dead time but not a dark screen with content", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "dim-"));
+    const file = join(dir, "d.mp4");
+    // 2 s moving, 2 s empty dark-grey screen (with sensor noise, so it isn't frozen), then 2 s of a dark UI
+    // with a scrolling white block covering about 8% of the screen, also with noise.
+    const dark = "color=c=0x1e1e1e:size=320x640:rate=30:duration=2";
+    execFileSync("ffmpeg", [
+      "-v", "error",
+      "-f", "lavfi", "-i", "testsrc2=size=320x640:rate=30:duration=2",
+      "-f", "lavfi", "-i", dark,
+      "-f", "lavfi", "-i", dark,
+      "-filter_complex",
+      "[1:v]noise=alls=6:allf=t[e];color=c=white:size=280x60:rate=30:duration=2[l];[2:v][l]overlay=x=20:y='80+150*t'[o];[o]noise=alls=6:allf=t[u];[0:v][e][u]concat=n=3:v=1[v]",
+      "-map", "[v]", "-pix_fmt", "yuv420p", file,
+    ]);
+    const spans = await idleSpans(file, 6);
+    expect(spans).toHaveLength(1);
+    expect(spans[0]!.start).toBeCloseTo(2, 0);
+    expect(spans[0]!.start + spans[0]!.duration).toBeLessThan(4.3);
+  });
+
   it("keeps the longest live stretch of a clip", () => {
     expect(liveRange({ duration: 10, idle: [{ start: 0, duration: 2 }, { start: 7, duration: 3 }] })).toEqual({ offset: 2, duration: 5 });
     expect(liveRange({ duration: 6 })).toEqual({ offset: 0, duration: 6 });

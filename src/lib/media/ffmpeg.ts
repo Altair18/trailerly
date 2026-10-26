@@ -209,7 +209,7 @@ export async function idleSpans(input: string, duration: number, min = 1.2): Pro
     "ffmpeg",
     [
       "-hide_banner", "-v", "info", "-i", input, "-map", "0:v:0",
-      "-vf", `freezedetect=n=0.003:d=${min},blackdetect=d=0.5:pic_th=0.9:pix_th=0.12`,
+      "-vf", `freezedetect=n=0.003:d=${min},blackdetect=d=0.5:pic_th=0.97:pix_th=0.2`,
       "-f", "null", "-",
     ],
     { maxBuffer: MAX_BUFFER },
