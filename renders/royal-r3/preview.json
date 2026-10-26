@@ -1,0 +1,108 @@
+{
+ "segments": [
+  {
+   "crop": {
+    "bottom": 0.18
+   },
+   "type": "screenshot",
+   "start": 0,
+   "duration": 4,
+   "image_id": "shot_2"
+  },
+  {
+   "crop": {
+    "bottom": 0.18
+   },
+   "type": "screenshot",
+   "start": 4,
+   "duration": 4,
+   "image_id": "shot_1"
+  },
+  {
+   "crop": {
+    "bottom": 0.17
+   },
+   "type": "screenshot",
+   "start": 8,
+   "duration": 4,
+   "image_id": "shot_5"
+  },
+  {
+   "crop": {
+    "bottom": 0.17
+   },
+   "type": "screenshot",
+   "start": 12,
+   "duration": 4,
+   "image_id": "shot_3"
+  },
+  {
+   "crop": {
+    "bottom": 0.17
+   },
+   "type": "screenshot",
+   "start": 16,
+   "duration": 4,
+   "image_id": "shot_4"
+  },
+  {
+   "crop": {
+    "bottom": 0.17
+   },
+   "type": "screenshot",
+   "start": 20,
+   "duration": 4,
+   "image_id": "shot_3"
+  },
+  {
+   "text": "Ready to unlock your next booster?",
+   "type": "text",
+   "start": 0,
+   "style": "hook",
+   "overlay": true,
+   "duration": 4
+  },
+  {
+   "text": "Match, blast, and unlock",
+   "type": "text",
+   "start": 4,
+   "style": "caption",
+   "overlay": true,
+   "duration": 4
+  },
+  {
+   "text": "Chests packed with rewards",
+   "type": "text",
+   "start": 8,
+   "style": "caption",
+   "overlay": true,
+   "duration": 4
+  },
+  {
+   "text": "Restore your royal castle",
+   "type": "text",
+   "start": 12,
+   "style": "caption",
+   "overlay": true,
+   "duration": 4
+  },
+  {
+   "text": "Climb to the top",
+   "type": "text",
+   "start": 16,
+   "style": "caption",
+   "overlay": true,
+   "duration": 4
+  },
+  {
+   "text": "Your royal match awaits",
+   "type": "text",
+   "start": 20,
+   "style": "brand",
+   "overlay": true,
+   "duration": 4
+  }
+ ],
+ "template": "question-answer",
+ "planned_by": "smart"
+}
