@@ -39,16 +39,19 @@ export function lintLandscapeTimeline(timeline: Timeline): string[] {
 }
 
 /**
- * Share of the bright (app screen) area of a greyscale frame that sits in big empty blocks: flat cells whose
- * whole neighbourhood (`span` cells each way) is flat and bright too. Margins, gaps between list rows and
- * padding are thin, so they don't count; a camera view that never loaded or a half-empty list does.
- * Returns 0 when the frame has almost no bright area (dark apps, title cards).
+ * Share of the app screen that sits in big empty blocks: flat cells whose whole neighbourhood (`span` cells
+ * each way) is flat too. Margins, gaps between list rows and padding are thin, so they don't count; a camera
+ * view that never loaded, a half-empty list or an empty dark canvas does. Light and dark screens are measured
+ * apart (a white screen against its bright cells, a dark-mode screen against its dark ones) and the worse one
+ * counts. Returns 0 for a tone with too few cells to judge.
  */
 export function blankShare(gray: Uint8Array, width: number, height: number, cell = 8, span = 2): number {
   const cols = Math.floor(width / cell);
   const rows = Math.floor(height / cell);
+  // 1 = flat light cell, 2 = flat dark cell.
   const flat = new Uint8Array(cols * rows);
-  let bright = 0;
+  let light = 0;
+  let dark = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       let sum = 0;
@@ -62,21 +65,30 @@ export function blankShare(gray: Uint8Array, width: number, height: number, cell
       }
       const n = cell * cell;
       const mean = sum / n;
-      if (mean < 170) continue;
-      bright++;
-      if (sq / n - mean * mean < 4) flat[r * cols + c] = 1;
+      const still = sq / n - mean * mean < 4;
+      if (mean >= 170) {
+        light++;
+        if (still) flat[r * cols + c] = 1;
+      } else if (mean <= 45) {
+        dark++;
+        if (still) flat[r * cols + c] = 2;
+      }
     }
   }
-  if (bright < 20) return 0;
-  let empty = 0;
-  for (let r = span; r < rows - span; r++) {
-    for (let c = span; c < cols - span; c++) {
-      let all = true;
-      for (let dr = -span; dr <= span && all; dr++) for (let dc = -span; dc <= span && all; dc++) all = flat[(r + dr) * cols + c + dc] === 1;
-      if (all) empty++;
+  const emptyOf = (tone: number) => {
+    let empty = 0;
+    for (let r = span; r < rows - span; r++) {
+      for (let c = span; c < cols - span; c++) {
+        let all = true;
+        for (let dr = -span; dr <= span && all; dr++) for (let dc = -span; dc <= span && all; dc++) all = flat[(r + dr) * cols + c + dc] === tone;
+        if (all) empty++;
+      }
     }
-  }
-  return empty / bright;
+    return empty;
+  };
+  const lightShare = light < 20 ? 0 : emptyOf(1) / light;
+  const darkShare = dark < 20 ? 0 : emptyOf(2) / dark;
+  return Math.max(lightShare, darkShare);
 }
 
 const FPS = 2;

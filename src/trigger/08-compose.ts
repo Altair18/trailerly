@@ -16,6 +16,20 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { FinalPayload } from "./payload";
 
 /**
+ * Something readable for a failed render. Remotion and child processes can throw errors with an empty
+ * message (or non-Error values), which used to log as nothing at all.
+ */
+export function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message.trim() || err.stack?.split("\n").slice(0, 3).join(" | ") || err.name;
+  if (typeof err === "string") return err || "Unknown error";
+  try {
+    return JSON.stringify(err) ?? "Unknown error";
+  } catch {
+    return String(err);
+  }
+}
+
+/**
  * Stage 8: render each output's Remotion composition from its timeline JSON.
  * Drafts: one third size + watermark. Finals (after payment): upscale AI clips first.
  */
@@ -93,8 +107,8 @@ export const compose = task({
           rendered.push(id);
         } catch (err) {
           // One output failing (say the header) shouldn't stop the others; the drafts page offers a retry.
-          await db.from("outputs").update({ status: "failed", error: (err as Error).message }).eq("id", output.id);
-          logger.error("Draft failed", { packId, spec: id, error: (err as Error).message });
+          await db.from("outputs").update({ status: "failed", error: errorText(err) }).eq("id", output.id);
+          logger.error("Draft failed", { packId, spec: id, error: errorText(err) });
           failed.push(id);
         }
       }
