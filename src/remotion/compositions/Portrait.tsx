@@ -27,9 +27,11 @@ export interface PortraitLayout {
 
 export function portraitLayout(look: Look, width: number, height: number): PortraitLayout {
   if (look === "bold") {
+    // A solid band of the app's colour on top, the screen edge to edge under it: the classic store layout.
+    const band = 0.22;
     return {
-      media: { x: 0, y: 0, w: width, h: height },
-      text: { x: width * 0.07, y: height * 0.075, w: width * 0.86, h: height * 0.2 },
+      media: { x: 0, y: height * band, w: width, h: height * (1 - band) },
+      text: { x: width * 0.07, y: height * 0.035, w: width * 0.86, h: height * (band - 0.05) },
       radius: 0,
       bleed: true,
     };
@@ -81,16 +83,16 @@ export function portraitStyle(look: Look, accent: string): PortraitStyle {
     };
   }
   if (look === "bold") {
-    const bright = luminance(accent) > 0.25;
+    const light = luminance(accent) > 0.4;
     return {
-      background: INK,
-      ink: "#FFFFFF",
-      muted: "rgba(255,255,255,.8)",
+      background: accent,
+      ink: light ? INK : "#FFFFFF",
+      muted: light ? "rgba(10,10,14,.7)" : "rgba(255,255,255,.8)",
       type: { ...DISPLAY, textTransform: "uppercase", letterSpacing: "0.005em" },
       size: 0.105,
-      key: (a) => ({ accent: bright ? a : YEL }),
-      align: "left",
-      grain: 0.04,
+      key: () => ({ style: { textDecoration: "underline", textDecorationThickness: "0.08em", textUnderlineOffset: "0.12em" } }),
+      align: "center",
+      grain: 0,
       push: () => 1,
     };
   }
@@ -116,6 +118,16 @@ function lineSize(text: string, width: number, share: number) {
   return Math.round(width * Math.min(share, (share * 26) / chars));
 }
 
+/**
+ * Width that splits a line into even rows, so a caption never ends on one word alone ("...to water / again").
+ * Glyphs average about half the font size across (less in the serif).
+ */
+export function balancedWidth(text: string, size: number, max: number, glyph = 0.5): number {
+  const one = text.length * size * glyph;
+  const rows = Math.ceil(one / max);
+  return rows <= 1 ? max : Math.min(max, (one / rows) * 1.18);
+}
+
 /** The frame behind everything: the look's backdrop, and in the cinematic look a slow push of the whole stage. */
 export function PortraitStage({ look, accent, children }: { look: Look; accent: string; children: ReactNode }) {
   const frame = useCurrentFrame();
@@ -124,8 +136,9 @@ export function PortraitStage({ look, accent, children }: { look: Look; accent: 
   const t = durationInFrames > 1 ? frame / (durationInFrames - 1) : 0;
   return (
     <AbsoluteFill style={{ background: S.background }}>
+      {/* The vignette darkens the backdrop's edges only: over the app's screen it reads as a smudge. */}
+      {S.vignette && <AbsoluteFill style={{ background: S.vignette }} />}
       <AbsoluteFill style={{ transform: `scale(${S.push(t)})`, transformOrigin: "50% 60%" }}>{children}</AbsoluteFill>
-      {S.vignette && <AbsoluteFill style={{ background: S.vignette, pointerEvents: "none" }} />}
       {S.grain > 0 && <Grain opacity={S.grain} />}
     </AbsoluteFill>
   );
@@ -162,10 +175,6 @@ export function PortraitShot({ media, look, width, height, index, fade }: { medi
       <div style={{ position: "absolute", left: m.x, top: m.y, width: m.w, height: m.h, borderRadius: L.radius, overflow: "hidden", opacity, background: "#000" }}>
         {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={fill} />}
       </div>
-      {L.bleed && (
-        // A dark wash at the top so the line of type reads on any screen.
-        <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,.45) 22%, transparent 42%)" }} />
-      )}
     </AbsoluteFill>
   );
 }
@@ -205,7 +214,7 @@ export function PortraitLine({ text, look, accent, width, height }: { text: stri
         width: t.w,
         height: t.h,
         display: "flex",
-        alignItems: L.bleed ? "flex-start" : "center",
+        alignItems: "center",
         justifyContent: S.align === "center" ? "center" : "flex-start",
         opacity: 1 - leave,
         transform: `translateY(${-leave * width * 0.03}px)`,
@@ -222,7 +231,7 @@ export function PortraitLine({ text, look, accent, width, height }: { text: stri
           fontSize: lineSize(text, width, S.size),
           textAlign: S.align,
           justifyContent: S.align === "center" ? "center" : "flex-start",
-          textShadow: L.bleed ? "0 2px 18px rgba(0,0,0,.45)" : undefined,
+          maxWidth: balancedWidth(text, lineSize(text, width, S.size), t.w, look === "cinematic" ? 0.4 : 0.5),
         }}
       />
     </div>
@@ -247,7 +256,7 @@ export function PortraitBrand({ brand, text, look, width, height }: { brand?: Br
         width: t.w,
         height: t.h,
         display: "flex",
-        alignItems: L.bleed ? "flex-start" : "center",
+        alignItems: "center",
         justifyContent: S.align === "center" ? "center" : "flex-start",
         gap: width * 0.04,
         opacity: rise,

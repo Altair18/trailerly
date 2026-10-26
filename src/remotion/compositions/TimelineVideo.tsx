@@ -1,10 +1,11 @@
-import { AbsoluteFill, Easing, Img, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
 import { DEFAULT_LOOK, LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
-import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, RevealWords, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
+import { type Brand, DISPLAY, ENTER_FRAMES, INK, PINK } from "./parts";
+import { PortraitBrand, PortraitCard, PortraitEnd, PortraitLine, PortraitShot, PortraitStage } from "./Portrait";
 
 export type { Brand } from "./parts";
 
@@ -160,7 +161,7 @@ function PortraitSegment({
 function Watermark({ width }: { width: number }) {
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-      <div style={{ ...DISPLAY, color: "rgba(255,255,255,0.22)", fontSize: Math.round(width * 0.16), transform: "rotate(-30deg)", whiteSpace: "nowrap" }}>
+      <div style={{ ...DISPLAY, color: "rgba(255,255,255,0.13)", fontSize: Math.round(width * 0.12), transform: "rotate(-30deg)", whiteSpace: "nowrap" }}>
         TRAILERLY DRAFT
       </div>
     </AbsoluteFill>

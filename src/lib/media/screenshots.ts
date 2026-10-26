@@ -14,7 +14,18 @@ export interface Screenshot {
 
 /** The listing's screenshots with stable ids ("shot_1", ...). */
 export function appScreenshots(listing: Pick<Listing, "screenshot_urls"> | null | undefined): Screenshot[] {
-  return (listing?.screenshot_urls ?? []).slice(0, MAX_SCREENSHOTS).map((url, i) => ({ id: `shot_${i + 1}`, url }));
+  return (listing?.screenshot_urls ?? []).slice(0, MAX_SCREENSHOTS).map((url, i) => ({ id: `shot_${i + 1}`, url: fullSize(url) }));
+}
+
+/**
+ * Apple's lookup API lists screenshots as small thumbnails (e.g. ".../392x696bb.jpg"). Its image server makes any
+ * size up to the original from the same path, so ask for one sharp enough to fill a 1290 px wide frame.
+ */
+export function fullSize(url: string): string {
+  return url.replace(/\/(\d+)x(\d+)(bb|w)\.(jpg|jpeg|png|webp)$/i, (m, w: string, h: string, kind: string, ext: string) => {
+    const k = Math.max(1, 1290 / Number(w));
+    return k <= 1 ? m : `/${Math.round(Number(w) * k)}x${Math.round(Number(h) * k)}${kind}.${ext}`;
+  });
 }
 
 /** Label each screenshot (what it shows, which feature, interest) with the same check as clips. Best-effort. */
