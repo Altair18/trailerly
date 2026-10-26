@@ -6,6 +6,7 @@ import { Gecko } from "@/components/landing/Gecko";
 import { Compare } from "@/components/landing/Compare";
 import { CHECKOUT_LIVE, PRICES } from "@/components/landing/pricing";
 import { RecordingToPack } from "@/components/landing/RecordingToPack";
+import { Showcase } from "@/components/landing/Showcase";
 import { Logo } from "@/components/TopBar";
 import "./landing.css";
 
@@ -113,6 +114,8 @@ export default function Home() {
         </section>
 
         <RecordingToPack />
+
+        <Showcase />
 
         <section id="rules" className="wrap lp-sec">
           <div className="lp-tile lp-rules">
