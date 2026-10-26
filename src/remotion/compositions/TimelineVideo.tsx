@@ -4,7 +4,7 @@ import { isOverlay } from "@/lib/timeline/enforce";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
 import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Media, type SafeArea, type SceneShot } from "./Landscape";
-import { AppIcon, type Brand, DISPLAY, INK, PUSH_IN, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
+import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
 
 export type { Brand } from "./parts";
 
@@ -57,8 +57,13 @@ export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, l
             )}
           </>
         ) : (
+          // Each shot stays up under the next one while it fades in, so a cut never shows the black backdrop.
           base.map((seg, i) => (
-            <Sequence key={`b${i}`} from={Math.round(seg.start * fps)} durationInFrames={Math.max(1, Math.round(seg.duration * fps))}>
+            <Sequence
+              key={`b${i}`}
+              from={Math.round(seg.start * fps)}
+              durationInFrames={Math.max(1, Math.round(seg.duration * fps)) + (i < base.length - 1 ? ENTER_FRAMES : 0)}
+            >
               <SegmentView segment={seg} index={i} {...view} />
             </Sequence>
           ))
