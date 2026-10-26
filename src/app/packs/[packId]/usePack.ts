@@ -60,11 +60,14 @@ export function usePack(packId: string, busy: (p: PackState) => boolean) {
     void load();
   }, [load]);
 
+  // Poll on a timer while busy rather than after each change: a poll that finds nothing new keeps the same pack
+  // object, so an effect keyed on the pack would never schedule the next one.
+  const isBusy = !!pack && busy(pack);
   useEffect(() => {
-    if (!pack || !busy(pack)) return;
-    const t = setTimeout(load, 2000);
-    return () => clearTimeout(t);
-  }, [pack, load, busy]);
+    if (!isBusy) return;
+    const t = setInterval(load, 2000);
+    return () => clearInterval(t);
+  }, [isBusy, load]);
 
   return { pack, error, reload: load };
 }
