@@ -1,7 +1,7 @@
 import { AbsoluteFill, Easing, Img, OffthreadVideo, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CSSProperties, ReactNode } from "react";
 import { type BrandFont, type BrandStyle, paletteFromAccent } from "@/lib/media/palette";
-import { type Box, type Media, type SafeArea, type SceneShot, safeBox, withAlpha } from "./Landscape";
+import { type Box, cropStyle, type Media, type SafeArea, type SceneShot, safeBox, withAlpha } from "./Landscape";
 import { AppIcon, type Brand, PINK, SERIF, UI } from "./parts";
 
 // The "brand" look, built from the agency benchmark (AppVideos.co's iOS 27 header and search samples among 13
@@ -59,12 +59,43 @@ function useCrossfade(fadeIn: boolean, fadeOut: boolean) {
   return Math.min(a, b);
 }
 
+/**
+ * The highlighter block agencies set their key words on (SatStacker, EarthSnap): a solid slab of the highlight colour
+ * with the words in the backdrop's deep colour, so the line reads at thumbnail size on any frame.
+ */
+export function blockStyle(S: BrandStyle): CSSProperties {
+  return {
+    color: S.bgDeep,
+    background: S.highlight,
+    padding: "0.02em 0.18em 0.06em",
+    borderRadius: "0.14em",
+    boxDecorationBreak: "clone",
+    WebkitBoxDecorationBreak: "clone",
+  };
+}
+
+/**
+ * A headline in two tones, the way agencies set it ("Snap a photo." / "Know what it is."): the first part in the ink
+ * colour, the second on a highlighter block. A short line keeps one row and blocks its last word.
+ */
 export function Headline({ text, S, size, align = "left", style }: { text: string; S: BrandStyle; size: number; align?: "left" | "center"; style?: CSSProperties }) {
   const [a, b] = splitHeadline(text);
+  const words = a.split(" ");
+  const short = !b && words.length >= 2;
   return (
     <div style={{ ...brandType(S.font), position: "relative", fontSize: size, color: S.ink, textAlign: align, ...style }}>
-      <div>{a}</div>
-      {b && <div style={{ color: S.highlight }}>{b}</div>}
+      {short ? (
+        <div>
+          {words.slice(0, -1).join(" ")} <span style={blockStyle(S)}>{words[words.length - 1]}</span>
+        </div>
+      ) : (
+        <div>{a}</div>
+      )}
+      {b && (
+        <div style={{ marginTop: "0.08em" }}>
+          <span style={blockStyle(S)}>{b}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -92,7 +123,7 @@ export function BrandBackdrop({ S, width, height, light }: { S: BrandStyle; widt
 }
 
 function MediaFill({ media, style }: { media: Media; style: CSSProperties }) {
-  return media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={style} /> : <Img src={media.src} style={style} />;
+  return media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={style} /> : <Img src={media.src} style={{ ...style, ...cropStyle(media.crop) }} />;
 }
 
 /** Frames a card's content takes to change over to the next shot. */

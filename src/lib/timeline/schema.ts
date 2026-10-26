@@ -22,6 +22,8 @@ export const Segment = z.object({
    * "brand" = app icon and name over the last seconds (text optional).
    */
   style: z.enum(["hook", "caption", "brand"]).optional(),
+  /** Screenshot segments: shares of the image cut off the top and bottom (the screenshot's own headline). */
+  crop: z.object({ top: z.number().min(0).max(0.6).optional(), bottom: z.number().min(0).max(0.6).optional() }).optional(),
 });
 export type Segment = z.infer<typeof Segment>;
 

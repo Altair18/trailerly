@@ -25,10 +25,10 @@ const good: Timeline = {
 };
 
 describe("fallbackPreview", () => {
-  it("passes the preview spec and trims to 30 s", () => {
+  it("passes the preview spec and trims to its 27 s target", () => {
     const t = fallbackPreview(clips, "Hello", OUTPUT_SPECS.preview);
     expect(enforceSpec(t, OUTPUT_SPECS.preview, clipSeconds)).toEqual([]);
-    expect(Math.max(...t.segments.map((s) => s.start + s.duration))).toBe(30);
+    expect(Math.max(...t.segments.map((s) => s.start + s.duration))).toBe(27);
   });
 });
 
@@ -57,8 +57,10 @@ describe("planTimeline with templates", () => {
       { source: "clip_3", caption: "Water reminders that adapt" },
       { source: "clip_4", caption: "Snap a leaf, get a fix" },
       { source: "clip_1", caption: "Track every plant" },
+      { source: "clip_3", offset: 1, caption: "Your plants, thriving" },
       { source: "clip_2", offset: 3 },
     ],
+    closing_line: "Never lose a plant again",
   };
 
   it("takes the fast model's fill when it builds a valid plan", async () => {
@@ -83,7 +85,7 @@ describe("planTimeline with templates", () => {
     });
     expect(tiers).toEqual(["fast", "smart"]);
     expect(result).toMatchObject({ source: "smart", attempts: 2 });
-    expect(prompts[1]).toMatch(/has 5 beats; you filled 3/);
+    expect(prompts[1]).toMatch(/has 6 beats; you filled 3/);
   });
 
   it("falls back to a code-built cut when both models fail", async () => {

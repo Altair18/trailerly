@@ -8,6 +8,8 @@ import { soundtrackFor } from "@/lib/media/music";
 import type { Look } from "@/remotion/compositions/Landscape";
 import { OUTPUT_SPECS } from "@/lib/specs/outputs";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
+import { buildFromTemplate, templateById } from "@/lib/timeline/templates";
+import { cropScreenshotHeadlines } from "@/lib/timeline/headlines";
 
 // Renders the App Store preview in each look, from store screenshots and from the demo recording.
 const D = process.env.DEMO_DIR!;
@@ -44,6 +46,51 @@ const recording: Timeline = {
   ],
 };
 
+// The agency script (hook, benefits, payoff, closing line) built the way the planner builds it, for SCRIPT=1.
+function scripted(): Record<string, Timeline> {
+  const spec = OUTPUT_SPECS.preview;
+  const hook = "Never forget to water again";
+  const demoClips = (JSON.parse(readFileSync(join(D, "clips.json"), "utf8")) as { id: string; duration: number }[]).map((c) => ({ ...c, notes: { label: "In use", interest: 4, personal_info: false } }));
+  const rec = buildFromTemplate(
+    templateById("promise-tour")!,
+    {
+      template_id: "promise-tour",
+      beats: [
+        { source: "clip_1", offset: 3.6 },
+        { source: "clip_2", offset: 2.2, caption: "Know when each plant is thirsty" },
+        { source: "clip_3", offset: 0.5, caption: "Name any plant in a snap" },
+        { source: "clip_1", offset: 0.5, caption: "Keep your streak alive" },
+        { source: "clip_2", offset: 0, caption: "Your plants, thriving" },
+        { source: "clip_3", offset: 1 },
+      ],
+      closing_line: "Happy plants, every day",
+    },
+    spec,
+    { hook, clips: demoClips },
+  );
+  const shotIds = ["shot_4", "shot_1", "shot_2", "shot_3"];
+  const screenshots = shotIds.map((id) => ({ id, notes: { label: "x", interest: 4, personal_info: false, headline_band: { edge: "top" as const, h: 0.13 } } }));
+  const shotsBuilt = buildFromTemplate(
+    templateById("promise-tour")!,
+    {
+      template_id: "promise-tour",
+      beats: [
+        { source: "shot_4" },
+        { source: "shot_1", caption: "Know when each plant is thirsty" },
+        { source: "shot_2", caption: "Name any plant in a snap" },
+        { source: "shot_3", caption: "Keep your streak alive" },
+        { source: "shot_1", caption: "Your plants, thriving" },
+        { source: "shot_4" },
+      ],
+      closing_line: "Happy plants, every day",
+    },
+    spec,
+    { hook, clips: [], screenshots: shotIds.map((id) => ({ id })) },
+  );
+  if (!rec.timeline || !shotsBuilt.timeline) throw new Error(JSON.stringify([rec.errors, shotsBuilt.errors]));
+  return { recording: rec.timeline, shots: cropScreenshotHeadlines(shotsBuilt.timeline, screenshots) };
+}
+
 it("renders the preview looks", async () => {
   const server = createServer((req, res) => {
     res.setHeader("content-type", req.url!.endsWith(".png") ? "image/png" : req.url!.endsWith(".jpg") ? "image/jpeg" : "video/mp4");
@@ -53,7 +100,9 @@ it("renders the preview looks", async () => {
   const url = (f: string) => `http://localhost:4558/${f}`;
   const accent = await iconAccent(join(D, "icon.png"));
   JSON.parse(readFileSync(join(D, "clips.json"), "utf8"));
-  for (const [name, timeline] of Object.entries({ shots, recording })) {
+  const timelines = process.env.SCRIPT ? scripted() : { shots, recording };
+  if (process.env.SCRIPT) console.log(JSON.stringify(timelines, null, 1));
+  for (const [name, timeline] of Object.entries(timelines)) {
     if (process.env.ONLY && process.env.ONLY !== name) continue;
     for (const look of LOOKS) {
       await renderOutput({

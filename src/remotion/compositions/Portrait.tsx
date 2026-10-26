@@ -1,6 +1,6 @@
 import { AbsoluteFill, Easing, Img, OffthreadVideo, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CSSProperties, ReactNode } from "react";
-import { Grain, keyWord, type Look, luminance, WARM, withAlpha } from "./Landscape";
+import { type Crop, cropStyle, Grain, keyWord, type Look, luminance, WARM, withAlpha } from "./Landscape";
 import { AppIcon, type Brand, DISPLAY, INK, RevealWords, SERIF, UI, YEL } from "./parts";
 import { BrandBackdrop, brandStyleOf, brandType, Headline, headlineSize, splitHeadline } from "./Brand";
 
@@ -153,7 +153,7 @@ export function PortraitStage({ look, accent, children, brand, width, height }: 
   );
 }
 
-export type PortraitMedia = { kind: "video"; src: string; trimBefore: number } | { kind: "image"; src: string };
+export type PortraitMedia = { kind: "video"; src: string; trimBefore: number } | { kind: "image"; src: string; crop?: Crop };
 
 /**
  * One shot of the app's screen in its box. The box is the same in every shot, so a cut reads as the screen
@@ -221,7 +221,7 @@ export function PortraitShot({
         <div style={{ ...box, boxShadow: `0 ${width * 0.04}px ${width * 0.1}px rgba(0,0,0,.5), 0 0 0 ${Math.max(2, Math.round(width * 0.004))}px rgba(255,255,255,.1)` }} />
       )}
       <div style={{ ...box, overflow: "hidden", opacity: card ? 1 : opacity, background: L.bleed && media.kind === "image" ? "transparent" : "#000" }}>
-        {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={still} />}
+        {media.kind === "video" ? <OffthreadVideo src={media.src} muted trimBefore={media.trimBefore} style={fill} /> : <Img src={media.src} style={{ ...still, ...cropStyle(media.crop) }} />}
         {sheen > 0 && sheen < 1 && (
           <div
             style={{
@@ -323,6 +323,7 @@ export function PortraitLine({ text, look, accent, brand, width, height, first =
 export function PortraitBrand({ brand, text, look, width, height }: { brand?: Brand; text?: string; look: Look; width: number; height: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  if (look === "brand" && text?.trim()) return <BrandClose brand={brand} text={text} width={width} height={height} />;
   const S = look === "brand" ? brandPortraitStyle(brand) : portraitStyle(look, brand?.accent ?? "#FF2E88");
   const L = portraitLayout(look, width, height);
   const rise = spring({ frame, fps, config: { damping: 18, stiffness: 120 } });
@@ -348,6 +349,27 @@ export function PortraitBrand({ brand, text, look, width, height }: { brand?: Br
       <div style={{ minWidth: 0 }}>
         <div style={{ ...S.type, textTransform: "none", color: S.ink, fontSize: lineSize(brand?.name ?? "", width, S.size * 0.8), lineHeight: 1 }}>{brand?.name ?? ""}</div>
         <div style={{ ...UI, color: S.muted, fontSize: Math.round(width * 0.036), fontWeight: 500, marginTop: width * 0.012 }}>{text?.trim() || "On the App Store"}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The brand look's close: a reason to install as the headline ("Never lose a plant again"), with the app's icon and
+ * name under it, already there on the first frame, over the last shot. Agency end cards give a reason, not just a name.
+ */
+function BrandClose({ brand, text, width, height }: { brand?: Brand; text: string; width: number; height: number }) {
+  const frame = useCurrentFrame();
+  const B = brandStyleOf(brand);
+  const T = portraitLayout("brand", width, height).text;
+  const fade = interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
+  const icon = Math.round(width * 0.075);
+  return (
+    <div style={{ position: "absolute", left: T.x, top: T.y, width: T.w, height: T.h, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: width * 0.025, opacity: fade }}>
+      <Headline text={text} S={B} size={headlineSize(splitHeadline(text), B.font, T.w, width * 0.095)} align="center" />
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: width * 0.022 }}>
+        <AppIcon brand={brand} size={icon} />
+        <div style={{ ...brandType(B.font), color: B.ink, fontSize: Math.round(width * 0.05), lineHeight: 1 }}>{brand?.name ?? ""}</div>
       </div>
     </div>
   );

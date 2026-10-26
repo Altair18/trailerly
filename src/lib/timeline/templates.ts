@@ -3,7 +3,7 @@ import { isPrivate, type Clip } from "@/lib/schemas/clips";
 import type { Screenshot } from "@/lib/media/screenshots";
 import { isLandscape, type OutputSpec } from "@/lib/specs/outputs";
 import { MAX_BEAT_SECONDS, MAX_OUTRO_SECONDS } from "./pacing";
-import { MAX_OVERLAY_CHARS, MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
+import { CAPTION_WORDS, MAX_OVERLAY_CHARS, MAX_OVERLAY_WORDS, readSeconds } from "./enforce";
 import { dropDangling, hookLine, shortLine } from "./preview";
 import type { Segment, Timeline } from "./schema";
 
@@ -42,52 +42,54 @@ const beat = (role: BeatRole, weight: number, note: string): Beat => ({ role, we
 // Landscape weights follow top apps' App Store videos: no beat over 5 s and a logo close of 2 s at the 12 s
 // header and 10 s search lengths (see render-lint).
 export const TEMPLATES: CutTemplate[] = [
+  // Portrait (App Store preview), after the agency benchmark: every agency preview runs 25-30 s as a hook that names
+  // the viewer's problem or wish, about three benefit beats of 4-5 s, a "life after" payoff and a closing line.
   {
     id: "promise-tour",
     name: "Promise, then prove it",
     shape: "portrait",
-    idea: "Open on the promise, then three features that back it up, one per beat.",
-    beats: [hook(3), beat("feature", 5, "the main feature in use"), beat("feature", 5, "a second feature"), beat("feature", 5, "a third feature"), close(3)],
+    idea: "Open on the promise, three benefits that back it up (one per beat), then life with the app.",
+    beats: [hook(3), beat("feature", 5, "the main benefit, in use"), beat("feature", 5, "a second benefit"), beat("feature", 5, "a third benefit"), beat("payoff", 4.5, "the result: life with the app"), close(3)],
     endCard: true,
   },
   {
     id: "problem-fix",
     name: "Problem, fix, payoff",
     shape: "portrait",
-    idea: "Name the pain in the hook, show the app fixing it in a few taps, end on the result.",
-    beats: [hook(3, "the moment that shows the problem the app solves"), beat("feature", 6, "the core action that fixes it"), beat("payoff", 5, "the result on screen"), beat("feature", 4, "one more reason to install"), close(3)],
+    idea: "Name the pain in the hook, show the app fixing it in a few taps, two more reasons, end on the result.",
+    beats: [hook(3, "the moment that shows the problem the app solves"), beat("feature", 5.5, "the core action that fixes it"), beat("feature", 4.5, "a second reason to install"), beat("feature", 4.5, "a third reason"), beat("payoff", 5, "the result on screen: the problem gone"), close(3)],
     endCard: true,
   },
   {
     id: "rapid-list",
     name: "Rapid list",
     shape: "portrait",
-    idea: "Fast cuts: four things the app does, one short caption each.",
-    beats: [hook(2.5), beat("feature", 3, "thing 1"), beat("feature", 3, "thing 2"), beat("feature", 3, "thing 3"), beat("feature", 3, "thing 4"), close(2.5)],
+    idea: "Fast cuts: four benefits, one short caption each, then the payoff.",
+    beats: [hook(2.5), beat("feature", 4, "benefit 1"), beat("feature", 4, "benefit 2"), beat("feature", 4, "benefit 3"), beat("feature", 4, "benefit 4"), beat("payoff", 4, "the result"), close(2.5)],
     endCard: true,
   },
   {
     id: "hero-deep",
     name: "One hero feature",
     shape: "portrait",
-    idea: "Spend most of the time on the app's best feature from start to finish, then one extra.",
-    beats: [hook(3), beat("feature", 9, "the hero feature, start to finish"), beat("feature", 4, "a supporting feature"), close(3)],
+    idea: "Spend most of the time on the app's best feature from start to finish, then two extras and the payoff.",
+    beats: [hook(3), beat("feature", 5, "the hero feature, first steps"), beat("feature", 5, "the hero feature, its result"), beat("feature", 4.5, "a supporting benefit"), beat("payoff", 4.5, "the result: life with the app"), close(3)],
     endCard: true,
   },
   {
     id: "question-answer",
     name: "Question, answer",
     shape: "portrait",
-    idea: "The hook asks a question; the next beat answers it on screen, then two quick proofs.",
-    beats: [hook(3, "a moment that sets up the question"), beat("payoff", 6, "the answer, shown in the app"), beat("feature", 4, "proof 1"), beat("feature", 4, "proof 2"), close(3)],
+    idea: "The hook asks a question; the next beat answers it on screen, then two quick proofs and the payoff.",
+    beats: [hook(3, "a moment that sets up the question"), beat("payoff", 5, "the answer, shown in the app"), beat("feature", 4.5, "proof 1"), beat("feature", 4.5, "proof 2"), beat("payoff", 4.5, "the result"), close(3)],
     endCard: true,
   },
   {
     id: "before-after",
     name: "Before and after",
     shape: "portrait",
-    idea: "Show the starting point (empty state, messy input), then the app's result, then one more feature.",
-    beats: [hook(3), beat("problem", 4, "before: the empty state or messy input"), beat("payoff", 6, "after: what the app turns it into"), beat("feature", 4, "one more feature"), close(3)],
+    idea: "Show the starting point (empty state, messy input), then the app's result, then two more benefits.",
+    beats: [hook(3), beat("problem", 4, "before: the empty state or messy input"), beat("payoff", 5.5, "after: what the app turns it into"), beat("feature", 4.5, "another benefit"), beat("feature", 4.5, "one more benefit"), close(3)],
     endCard: true,
   },
   {
@@ -150,6 +152,8 @@ export const TemplateFill = z.object({
   ),
   /** Call to action for the end card of social ads. */
   cta: z.string().optional(),
+  /** The App Store preview's closing line, under the app's name at the end: the reason to install, 2-5 words. */
+  closing_line: z.string().optional(),
 });
 export type TemplateFill = z.infer<typeof TemplateFill>;
 
@@ -163,11 +167,17 @@ export interface FillContext {
 const round = (n: number) => Math.round(n * 100) / 100;
 const BRAND_MIN = 2;
 /** A still screenshot holds attention for a few seconds at most (top apps' previews cut every 3-4 s). */
-const SCREENSHOT_MAX = 3.5;
+const SCREENSHOT_MAX = 4;
 /** A closing card that only shows the app's name and a line. */
 const CLOSE_MAX = 3;
 /** A recording beat in a portrait video cuts after this long (agency previews cut every 3-5 s on real actions). */
 const CLIP_BEAT_MAX = 5;
+/**
+ * Apple shows the frame at 5 s as the preview's poster until it plays, so no cut lands within this many seconds of
+ * it: the poster is always one settled shot with its whole caption, never a change-over.
+ */
+export const POSTER_SECOND = 5;
+const POSTER_CLEAR = 0.5;
 
 /** A caption that fits the on-screen limits: a few words, cut at a natural break, never over the character cap. */
 export function tidyCaption(text: string): string {
@@ -212,6 +222,8 @@ export function buildFromTemplate(
   const weightSum = template.beats.reduce((n, b) => n + b.weight, 0);
   const useEndCard = template.endCard && spec.allowedSegments.includes("end_card") && !!fill.cta?.trim();
   const cta = useEndCard ? tidyCaption(fill.cta!) : "";
+  // Portrait videos end on a reason to install under the app's name, not just the name.
+  const closing = !useEndCard && !isLandscape(spec) && fill.closing_line?.trim() ? tidyCaption(fill.closing_line) : "";
 
   // Stills never hold past a few seconds, unless the video would come out under the spec's minimum.
   const stillBeats = template.beats.length - (useEndCard ? 1 : 0);
@@ -230,7 +242,7 @@ export function buildFromTemplate(
     const clip = clips.get(f.source);
     const offset = clip ? Math.min(f.offset ?? 0, Math.max(0, clip.duration - 0.5)) : 0;
     const available = clip ? clip.duration - offset : stillMax;
-    const text = i === 0 ? opening : b.role === "close" ? cta : captions[i]!;
+    const text = i === 0 ? opening : b.role === "close" ? cta || closing : captions[i]!;
     const least = Math.max(b.role === "close" ? BRAND_MIN : 1.2, text ? readSeconds(text) : 0);
     const isLastCard = b.role === "close" && useEndCard;
     if (!isLastCard && !clip && !shots.has(f.source)) errors.push(`Beat ${i + 1}: unknown clip or screenshot "${f.source}".`);
@@ -276,6 +288,7 @@ export function buildFromTemplate(
     errors.push(`The clips you picked only fill ${round(sum)}s; ${spec.label} needs at least ${spec.minSeconds}s. Use longer clips or add screenshots.`);
   }
   if (errors.length) return { timeline: null, errors };
+  if (!isLandscape(spec) && !spec.loop) keepPosterClear(lengths, slots);
 
   const segments: Segment[] = [];
   const overlays: Segment[] = [];
@@ -295,10 +308,31 @@ export function buildFromTemplate(
         : { type: "screenshot", start, duration, image_id: s.source },
     );
     if (i === 0) overlays.push({ type: "text", overlay: true, style: "hook", start, duration, text: opening });
-    else if (s.beat.role === "close") overlays.push({ type: "text", overlay: true, style: "brand", start, duration });
+    else if (s.beat.role === "close") overlays.push({ type: "text", overlay: true, style: "brand", start, duration, ...(closing ? { text: closing } : {}) });
     else if (captions[i]) overlays.push({ type: "text", overlay: true, style: "caption", start, duration, text: captions[i] });
   });
   return { timeline: { segments: [...segments, ...overlays], template: template.id }, errors: [] };
+}
+
+/**
+ * Move a cut that lands within POSTER_CLEAR of the poster second to just outside it, taking the time from one
+ * neighbouring beat and giving it to the other, as long as both still have the time and footage for it.
+ */
+export function keepPosterClear(lengths: number[], slots: { available: number; least: number }[]): void {
+  let at = 0;
+  for (let k = 1; k < lengths.length; k++) {
+    at += lengths[k - 1]!;
+    const off = at - POSTER_SECOND;
+    if (Math.abs(off) >= POSTER_CLEAR) continue;
+    const later = POSTER_CLEAR - off; // grow beat k-1 so the cut moves to 5.5 s
+    const earlier = POSTER_CLEAR + off; // shrink beat k-1 so the cut moves to 4.5 s
+    const canLater = lengths[k]! - later >= slots[k]!.least && lengths[k - 1]! + later <= slots[k - 1]!.available;
+    const canEarlier = lengths[k - 1]! - earlier >= slots[k - 1]!.least && lengths[k]! + earlier <= slots[k]!.available;
+    const move = canLater && (!canEarlier || later <= earlier) ? later : canEarlier ? -earlier : 0;
+    lengths[k - 1] = lengths[k - 1]! + move;
+    lengths[k] = lengths[k]! - move;
+    return;
+  }
 }
 
 export const TEMPLATE_SYSTEM = `You edit short app videos from proven templates. Pick ONE template from the list and fill
@@ -312,12 +346,16 @@ login screen). Match each beat's note. Prefer high-interest clips, and use each 
 too few. Start clips after any dead_time (frozen, loading or black stretches) by setting offset. Never use a clip
 marked personal_info unless nothing else fits. Use screenshots only when the clips run out or are private.
 
-Captions: ${MAX_OVERLAY_WORDS} words at most, plain and concrete, written for video in the brief's tone ("Snap a photo,
-get an answer"), naming what the viewer sees in that beat. Never copy the listing.
-If no hook is given, the first beat's caption is the opening hook line. For social ads with an end card, add "cta":
-a short call to action (e.g. "Download free today").
+Captions: 2 to ${CAPTION_WORDS} words, plain and punchy, in the brief's tone. Each one names what the viewer gets in that
+beat, not what the screen shows ("Know every plant by name", not "Plant identification screen"). Feature beats are
+benefits; a payoff beat is life after the app ("Your plants, thriving"). Never copy the listing, and never repeat the
+words of the hook or of a screenshot's own headline.
+If no hook is given, the first beat's caption is the opening hook line and must name the viewer's problem or the
+result they want. For the App Store preview, add "closing_line": 2 to ${CAPTION_WORDS} words shown under the app's
+name at the end, the reason to install, often echoing the hook ("Never lose a plant again"). For social ads with an
+end card, add "cta": a short call to action (e.g. "Download free today").
 
-Return JSON: {"template_id": "...", "beats": [...], "cta": "..."}.`;
+Return JSON: {"template_id": "...", "beats": [...], "closing_line": "...", "cta": "..."}.`;
 
 /** The prompt for one output: the spec, the fixed hook, the media and the templates to pick from. */
 export function templatePrompt(
