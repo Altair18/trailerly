@@ -74,6 +74,8 @@ const FILL: CSSProperties = { width: "100%", height: "100%", objectFit: "cover" 
  */
 export type Look = "studio" | "cinematic" | "bold";
 export const LOOKS: Look[] = ["studio", "cinematic", "bold"];
+/** The user picked cinematic for header and search (26 Oct, from studio, cinematic and bold side by side). */
+export const DEFAULT_LOOK: Look = "cinematic";
 
 /** Relative luminance of "#RRGGBB" (0 black to 1 white). */
 function luminance(hex: string): number {

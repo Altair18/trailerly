@@ -13,7 +13,7 @@ import { buildFromTemplate, templateById, type TemplateFill } from "@/lib/timeli
 const D = process.env.DEMO_DIR!;
 const SCALE = Number(process.env.SCALE ?? 0.5);
 const ONLY = process.env.ONLY?.split(",");
-const LOOKS = (process.env.LOOKS ?? "studio").split(",") as Look[];
+const LOOKS = (process.env.LOOKS ?? "cinematic").split(",") as Look[];
 const raw = JSON.parse(readFileSync(join(D, "clips.json"), "utf8"));
 const NOTES: Record<string, { label: string; interest: number; feature: string }> = {
   clip_1: { label: "Ticks off today's waterings", interest: 4, feature: "Watering reminders" },

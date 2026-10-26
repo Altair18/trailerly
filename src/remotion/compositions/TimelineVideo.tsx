@@ -3,7 +3,7 @@ import type React from "react";
 import { isOverlay } from "@/lib/timeline/enforce";
 import type { Segment, Timeline } from "@/lib/timeline/schema";
 import { useBrandFonts } from "../fonts";
-import { LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
+import { DEFAULT_LOOK, LandscapeCard, LandscapeOverlay, LandscapeScene, type Look, type Media, type SafeArea, type SceneShot } from "./Landscape";
 import { AppIcon, type Brand, DISPLAY, ENTER_FRAMES, INK, PUSH_IN, RevealWords, UI, useEntrance, useExit, Words, fitSize, YEL } from "./parts";
 
 export type { Brand } from "./parts";
@@ -33,7 +33,7 @@ export interface TimelineVideoProps extends Record<string, unknown> {
 const LOOP_FADE = 15;
 
 
-export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea, look }: TimelineVideoProps) {
+export function TimelineVideo({ timeline, clipUrls, imageUrls = {}, watermark, loop, baseWidth, baseHeight, brand, safeArea, look = DEFAULT_LOOK }: TimelineVideoProps) {
   useBrandFonts();
   const { fps, width, durationInFrames } = useVideoConfig();
   const landscape = baseWidth > baseHeight;
