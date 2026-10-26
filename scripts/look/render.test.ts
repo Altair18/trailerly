@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { it } from "vitest";
 import { renderOutput } from "@/lib/render";
 import { iconAccent } from "@/lib/media/accent";
+import { lintLandscapeTimeline } from "@/lib/media/render-lint";
 import { OUTPUT_SPECS, type OutputSpecId } from "@/lib/specs/outputs";
 import { avoidDeadTime } from "@/lib/timeline/dead-time";
 import { buildFromTemplate, templateById, type TemplateFill } from "@/lib/timeline/templates";
@@ -51,6 +52,7 @@ it("renders header and search", async () => {
         scale: SCALE,
       },
     });
+    console.log(id, "lint:", lintLandscapeTimeline(timeline));
   }
   server.close();
 });
